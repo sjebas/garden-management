@@ -1322,7 +1322,12 @@ td {
     justify-content: flex-start;
   }
 
-  .garden-pin,
+  .garden-pin {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+  }
+
   .map-location-remove {
     width: auto;
   }
