@@ -2,9 +2,18 @@ from __future__ import annotations
 
 import json
 import os
+from typing import Iterable
 
 from google import genai
 from google.genai import types
+
+
+DEFAULT_GEMINI_MODELS = [
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.5-flash",
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash-lite",
+]
 
 
 ANALYSIS_SCHEMA = {
@@ -57,11 +66,84 @@ ANALYSIS_SCHEMA = {
 }
 
 
+class GeminiError(RuntimeError):
+    pass
+
+
+class GeminiQuotaError(GeminiError):
+    pass
+
+
 def gemini_client() -> genai.Client:
     api_key = os.getenv("GEMINI_API_KEY", "").strip() or os.getenv("GOOGLE_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("GEMINI_API_KEY ontbreekt.")
     return genai.Client(api_key=api_key)
+
+
+def _model_candidates() -> list[str]:
+    configured = os.getenv("GEMINI_MODEL", "").strip()
+    configured_fallbacks = [
+        item.strip()
+        for item in os.getenv("GEMINI_FALLBACK_MODELS", "").split(",")
+        if item.strip()
+    ]
+    ordered: list[str] = [*([configured] if configured else []), *DEFAULT_GEMINI_MODELS, *configured_fallbacks]
+    seen = set()
+    models = []
+    for model in ordered:
+        lowered = model.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        models.append(model)
+    return models
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    message = str(exc).lower()
+    quota_markers = [
+        "resource_exhausted",
+        "quota",
+        "rate limit",
+        "429",
+        "retrydelay",
+        "generaterequestsperday",
+    ]
+    return any(marker in message for marker in quota_markers)
+
+
+def _generate_with_fallback(
+    client: genai.Client,
+    *,
+    contents: Iterable[object],
+    config: dict[str, object],
+) -> str:
+    quota_failures = []
+    last_error: Exception | None = None
+
+    for model in _model_candidates():
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=list(contents),
+                config=config,
+            )
+            return response.text
+        except Exception as exc:
+            last_error = exc
+            if _is_quota_error(exc):
+                quota_failures.append(model)
+                continue
+            raise GeminiError(
+                "Er ging iets mis bij het maken van een voorstel. Probeer het zo nog eens."
+            ) from exc
+
+    if quota_failures:
+        raise GeminiQuotaError(
+            "De slimme invoer zit even aan het daglimiet. Probeer het later opnieuw."
+        ) from last_error
+    raise GeminiError("Er ging iets mis bij het maken van een voorstel. Probeer het zo nog eens.") from last_error
 
 
 def analyze_plant_image(
@@ -145,8 +227,8 @@ Bestaande voorbeeldtaken:
     if has_image:
         contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
 
-    response = client.models.generate_content(
-        model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
+    response_text = _generate_with_fallback(
+        client,
         contents=contents,
         config={
             "response_mime_type": "application/json",
@@ -154,4 +236,4 @@ Bestaande voorbeeldtaken:
             "temperature": 0.3,
         },
     )
-    return json.loads(response.text)
+    return json.loads(response_text)

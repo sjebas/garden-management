@@ -13,7 +13,7 @@ from math import ceil
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
 from data_store import create_store, generate_task_id
-from gemini_helper import analyze_plant_image
+from gemini_helper import GeminiError, GeminiQuotaError, analyze_plant_image
 from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, GardenWorkbook
 
 
@@ -347,8 +347,14 @@ def create_app() -> Flask:
                 allowed_priorities=reference["priorities"],
                 allowed_durations=reference["durations"],
             )
-        except Exception as exc:
-            flash(f"Kon geen voorstellen genereren: {exc}", "error")
+        except GeminiQuotaError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("plants"))
+        except GeminiError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("plants"))
+        except Exception:
+            flash("Er ging iets mis bij het maken van een voorstel. Probeer het zo nog eens.", "error")
             return redirect(url_for("plants"))
 
         selected_month = request.args.get("month") or _current_month_name()
