@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import datetime
+import json
+import mimetypes
 import os
 from pathlib import Path
 import secrets
@@ -9,6 +11,7 @@ import secrets
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
 from data_store import create_store, generate_task_id
+from gemini_helper import propose_tasks_from_image
 from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, GardenWorkbook
 
 
@@ -160,6 +163,21 @@ def _next_up(tasks: list[dict[str, str]]) -> list[dict[str, str]]:
     )[:8]
 
 
+def _proposal_form_values(form, index: int) -> dict[str, str]:
+    return {
+        "Plant": form.get(f"proposal-{index}-Plant", "").strip(),
+        "Maand": form.get(f"proposal-{index}-Maand", "").strip(),
+        "Week": form.get(f"proposal-{index}-Week", "").strip(),
+        "Categorie": form.get(f"proposal-{index}-Categorie", "").strip(),
+        "Actie": form.get(f"proposal-{index}-Actie", "").strip(),
+        "Prioriteit": form.get(f"proposal-{index}-Prioriteit", "").strip(),
+        "Status": "Open",
+        "Duur": form.get(f"proposal-{index}-Duur", "").strip(),
+        "Opmerking": form.get(f"proposal-{index}-Opmerking", "").strip(),
+        "DashboardVolgorde": "",
+    }
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
@@ -218,7 +236,142 @@ def create_app() -> Flask:
             month_summary=month_summary,
             next_up=_next_up(tasks),
             total_plants=len(plants),
+            plants_for_upload=[plant["Plant"] for plant in plants],
+            proposal_result=None,
         )
+
+    @app.post("/assistant/propose")
+    def propose_tasks():
+        plants = _plants_with_stats()
+        reference = _load_reference_data()
+        plant_name = request.form.get("plant_name", "").strip()
+        image = request.files.get("plant_photo")
+
+        if not plant_name:
+            flash("Kies eerst een plant.", "error")
+            return redirect(url_for("dashboard"))
+        if image is None or not image.filename:
+            flash("Upload eerst een foto van de plant.", "error")
+            return redirect(url_for("dashboard"))
+
+        mime_type = image.mimetype or mimetypes.guess_type(image.filename)[0] or ""
+        if not mime_type.startswith("image/"):
+            flash("Alleen afbeeldingsbestanden zijn toegestaan.", "error")
+            return redirect(url_for("dashboard"))
+
+        image_bytes = image.read()
+        if not image_bytes:
+            flash("De geuploade foto is leeg.", "error")
+            return redirect(url_for("dashboard"))
+
+        all_tasks = STORE.list_tasks()
+        plant_profile = next((plant for plant in plants if plant["Plant"] == plant_name), None)
+        existing_tasks = [task for task in all_tasks if task["Plant"] == plant_name]
+
+        try:
+            proposal_result = propose_tasks_from_image(
+                plant_name=plant_name,
+                image_bytes=image_bytes,
+                mime_type=mime_type,
+                current_month=_current_month_name(),
+                plant_profile=plant_profile,
+                existing_tasks=existing_tasks,
+                allowed_months=reference["months"],
+                allowed_categories=reference["categories"],
+                allowed_priorities=reference["priorities"],
+                allowed_durations=reference["durations"],
+            )
+        except Exception as exc:
+            flash(f"Kon geen voorstellen genereren: {exc}", "error")
+            return redirect(url_for("dashboard"))
+
+        selected_month = request.args.get("month") or _current_month_name()
+        if selected_month not in MONTHS:
+            selected_month = _current_month_name()
+        month_tasks = [task for task in all_tasks if task["Maand"] == selected_month]
+        summary = _monthly_summary(all_tasks)
+        month_summary = next(entry for entry in summary if entry["month"] == selected_month)
+        workload = []
+        for item in _plant_workload(plants, all_tasks):
+            matching = [task for task in month_tasks if task["Plant"] == item["plant"]]
+            if matching:
+                workload.append(
+                    {
+                        "plant": item["plant"],
+                        "tasks": len(matching),
+                        "open": sum(task["Status"] != "Gereed" for task in matching),
+                        "high": sum(task["Prioriteit"] == "Hoog" for task in matching),
+                    }
+                )
+
+        proposal_tasks = []
+        for item in proposal_result.get("tasks", []):
+            proposal_tasks.append(
+                {
+                    "Plant": plant_name,
+                    "Maand": str(item.get("month", "")).strip(),
+                    "Week": str(item.get("week", "")).strip(),
+                    "Categorie": str(item.get("category", "")).strip(),
+                    "Actie": str(item.get("action", "")).strip(),
+                    "Prioriteit": str(item.get("priority", "")).strip(),
+                    "Duur": str(item.get("duration", "")).strip(),
+                    "Opmerking": str(item.get("note", "")).strip(),
+                    "Confidence": item.get("confidence", ""),
+                    "Reason": str(item.get("reason", "")).strip(),
+                }
+            )
+
+        return render_template(
+            "dashboard.html",
+            page_title="Dashboard",
+            selected_month=selected_month,
+            months=MONTHS,
+            tasks=sorted(
+                month_tasks,
+                key=lambda task: (
+                    PRIORITY_ORDER.get(task["Prioriteit"], 99),
+                    STATUS_ORDER.get(task["Status"], 99),
+                    int(task["Week"]) if str(task["Week"]).isdigit() else 99,
+                    task["Plant"],
+                ),
+            ),
+            workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
+            month_summary=month_summary,
+            next_up=_next_up(all_tasks),
+            total_plants=len(plants),
+            plants_for_upload=[plant["Plant"] for plant in plants],
+            proposal_result={
+                "summary": proposal_result.get("summary", ""),
+                "tasks": proposal_tasks,
+                "plant_name": plant_name,
+            },
+            proposal_reference=reference,
+        )
+
+    @app.post("/assistant/accept")
+    def accept_proposals():
+        count = int(request.form.get("proposal-count", "0") or "0")
+        created = 0
+        existing_ids = [task["ID"] for task in STORE.list_tasks()]
+        for index in range(count):
+            if request.form.get(f"proposal-{index}-selected") != "1":
+                continue
+            values = _proposal_form_values(request.form, index)
+            if not values["Plant"] or not values["Maand"] or not values["Actie"]:
+                continue
+            values["ID"] = generate_task_id(existing_ids, values["Plant"])
+            existing_ids.append(values["ID"])
+            try:
+                STORE.create_task(values)
+            except ValueError:
+                continue
+            created += 1
+
+        if created:
+            flash(f"{created} voorgestelde taken toegevoegd aan de database.", "success")
+        else:
+            flash("Geen taken toegevoegd. Selecteer minstens een geldig voorstel.", "error")
+        return redirect(url_for("tasks"))
 
     @app.route("/tasks")
     def tasks():

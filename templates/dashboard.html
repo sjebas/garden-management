@@ -5,7 +5,7 @@
     <div>
       <p class="eyebrow">Seizoensoverzicht</p>
       <h1>Een rustige plek voor alle tuinklussen.</h1>
-      <p class="lede">De app leest rechtstreeks uit het Excelbestand en maakt er een bruikbaar dashboard van met maandtaken, plantdrukte en een jaarbeeld.</p>
+      <p class="lede">De app leest de bestaande tuinplanning in, bewaart alles in Firestore en helpt nu ook met fotogestuurde taakvoorstellen per plant.</p>
     </div>
     <form method="get" class="month-picker">
       <label for="month">Gekozen maand</label>
@@ -16,6 +16,85 @@
       </select>
     </form>
   </section>
+
+  <section class="panel upload-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Slimme invoer</p>
+        <h2>Upload een foto en laat Gemini taken voorstellen</h2>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('propose_tasks') }}" enctype="multipart/form-data" class="editor-grid">
+      <select name="plant_name" required>
+        <option value="">Kies een plant</option>
+        {% for plant in plants_for_upload %}
+          <option value="{{ plant }}" {% if proposal_result and proposal_result.plant_name == plant %}selected{% endif %}>{{ plant }}</option>
+        {% endfor %}
+      </select>
+      <input type="file" name="plant_photo" accept="image/*" required>
+      <button type="submit">Analyseer foto</button>
+    </form>
+    <p class="task-note">Gebruik dit voor snelle suggesties. Je kunt elk voorstel nog aanpassen voordat je het opslaat.</p>
+  </section>
+
+  {% if proposal_result %}
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Gemini voorstel</p>
+          <h2>Voorgestelde taken voor {{ proposal_result.plant_name }}</h2>
+        </div>
+      </div>
+      {% if proposal_result.summary %}
+        <p class="lede compact-lede">{{ proposal_result.summary }}</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('accept_proposals') }}">
+        <input type="hidden" name="proposal-count" value="{{ proposal_result.tasks|length }}">
+        <div class="proposal-stack">
+          {% for proposal in proposal_result.tasks %}
+            <article class="proposal-card">
+              <label class="proposal-toggle">
+                <input type="checkbox" name="proposal-{{ loop.index0 }}-selected" value="1" checked>
+                <span>Toevoegen aan planning</span>
+              </label>
+              <div class="proposal-grid">
+                <input type="hidden" name="proposal-{{ loop.index0 }}-Plant" value="{{ proposal.Plant }}">
+                <select name="proposal-{{ loop.index0 }}-Maand">
+                  {% for month in proposal_reference.months %}
+                    <option value="{{ month }}" {% if proposal.Maand == month %}selected{% endif %}>{{ month }}</option>
+                  {% endfor %}
+                </select>
+                <input name="proposal-{{ loop.index0 }}-Week" value="{{ proposal.Week }}" placeholder="Week">
+                <select name="proposal-{{ loop.index0 }}-Categorie">
+                  {% for category in proposal_reference.categories %}
+                    <option value="{{ category }}" {% if proposal.Categorie == category %}selected{% endif %}>{{ category }}</option>
+                  {% endfor %}
+                </select>
+                <select name="proposal-{{ loop.index0 }}-Prioriteit">
+                  {% for priority in proposal_reference.priorities %}
+                    <option value="{{ priority }}" {% if proposal.Prioriteit == priority %}selected{% endif %}>{{ priority }}</option>
+                  {% endfor %}
+                </select>
+                <input name="proposal-{{ loop.index0 }}-Duur" value="{{ proposal.Duur }}" list="proposal-duration-options" placeholder="Duur">
+                <textarea name="proposal-{{ loop.index0 }}-Actie" required>{{ proposal.Actie }}</textarea>
+                <textarea name="proposal-{{ loop.index0 }}-Opmerking">{{ proposal.Opmerking }}</textarea>
+              </div>
+              <div class="proposal-meta">
+                <span class="chip">Confidence <strong>{{ proposal.Confidence }}</strong></span>
+                <span class="chip">{{ proposal.Reason }}</span>
+              </div>
+            </article>
+          {% endfor %}
+        </div>
+        <datalist id="proposal-duration-options">
+          {% for duration in proposal_reference.durations %}
+            <option value="{{ duration }}"></option>
+          {% endfor %}
+        </datalist>
+        <button type="submit">Geselecteerde taken opslaan</button>
+      </form>
+    </section>
+  {% endif %}
 
   <section class="stat-grid">
     <article class="stat-card">

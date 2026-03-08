@@ -4,8 +4,8 @@ options:
 substitutions:
   _SERVICE_NAME: garden-manager
   _REGION: europe-west1
-  _REPOSITORY: garden-flow
-  _IMAGE_NAME: garden-flow
+  _REPOSITORY: garden-management
+  _IMAGE_NAME: garden-manager
   _FIRESTORE_COLLECTION_PREFIX: garden
   _RUNTIME_SERVICE_ACCOUNT: garden-flow-runner@$PROJECT_ID.iam.gserviceaccount.com
   _MAX_INSTANCES: "4"

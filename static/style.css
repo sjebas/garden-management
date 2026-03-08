@@ -392,6 +392,57 @@ td {
   color: var(--muted);
 }
 
+.upload-panel {
+  margin-bottom: 18px;
+}
+
+.compact-lede {
+  margin-bottom: 18px;
+}
+
+.proposal-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.proposal-card {
+  padding: 18px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(32, 49, 39, 0.08);
+}
+
+.proposal-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.proposal-grid textarea {
+  grid-column: 1 / -1;
+}
+
+.proposal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-weight: 700;
+}
+
+.proposal-toggle input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.proposal-meta {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
 .flash-stack {
   display: grid;
   gap: 10px;
@@ -452,6 +503,10 @@ td {
   }
 
   .editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .proposal-grid {
     grid-template-columns: 1fr;
   }
 }

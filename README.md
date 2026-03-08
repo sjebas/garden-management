@@ -49,6 +49,7 @@ Deze repo is voorbereid voor Cloud Build en Cloud Run.
 - [Dockerfile](/Users/sebas/Documents/garden-management/Dockerfile) bouwt de app met `gunicorn`
 - [cloudbuild.yaml](/Users/sebas/Documents/garden-management/cloudbuild.yaml) bouwt en deployed naar Cloud Run
 - [app.py](/Users/sebas/Documents/garden-management/app.py) ondersteunt Firestore als productie-opslag
+- [gemini_helper.py](/Users/sebas/Documents/garden-management/gemini_helper.py) genereert fotogebaseerde taakvoorstellen via Gemini
 
 Belangrijk:
 
@@ -56,6 +57,7 @@ Belangrijk:
 - Je moet in Google Cloud eerst Firestore in Native mode activeren in hetzelfde project.
 - De app gebruikt standaard de collecties `${prefix}_plants` en `${prefix}_tasks`, waarbij `prefix` uit `FIRESTORE_COLLECTION_PREFIX` komt.
 - De Cloud Build deploy target is `garden-manager` in `europe-west1` en forceert `ingress=all`, `allow-unauthenticated` en de runtime service account.
+- Voor de foto-assistent moet `GEMINI_API_KEY` als environment variable beschikbaar zijn.
 
 ## Cloud Run trigger
 
