@@ -32,9 +32,18 @@ a {
   text-decoration: none;
 }
 
+main {
+  display: grid;
+  gap: 18px;
+}
+
 .page-shell {
   width: min(1200px, calc(100vw - 32px));
   margin: 24px auto 40px;
+}
+
+.mobile-tabbar {
+  display: none;
 }
 
 .topbar {
@@ -89,6 +98,7 @@ h2 {
   padding: 10px 14px;
   border-radius: 999px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .nav a.active,
@@ -167,6 +177,10 @@ h2 {
 .month-picker {
   min-width: 220px;
   flex-direction: column;
+}
+
+.month-picker select {
+  min-width: 0;
 }
 
 label,
@@ -268,6 +282,13 @@ button {
 .week-stack {
   display: grid;
   gap: 12px;
+}
+
+.workload-row {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: grid;
+  gap: 12px;
+  align-items: center;
 }
 
 .task-item,
@@ -483,6 +504,7 @@ td {
   border-radius: 18px;
   border: 1px solid var(--line);
   background: rgba(255, 251, 245, 0.86);
+  line-height: 1.45;
 }
 
 .flash-success {
@@ -538,16 +560,54 @@ td {
   .proposal-grid {
     grid-template-columns: 1fr;
   }
+
+  .workload-row {
+    grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  }
 }
 
 @media (max-width: 640px) {
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(209, 138, 65, 0.14), transparent 30%),
+      linear-gradient(180deg, #f8f1e6 0%, #efe5d4 100%);
+  }
+
   .page-shell {
     width: min(100vw - 18px, 1200px);
     margin-top: 10px;
+    margin-bottom: 108px;
   }
 
   .topbar {
-    border-radius: 28px;
+    padding: 18px;
+    border-radius: 32px;
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .brand {
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .brand span:last-child {
+    min-width: 0;
+  }
+
+  .brand strong {
+    display: block;
+    font-size: 1.2rem;
+    line-height: 1.05;
+  }
+
+  .brand small {
+    margin-top: 4px;
+    font-size: 0.95rem;
+  }
+
+  .nav {
+    display: none;
   }
 
   .stat-grid,
@@ -556,6 +616,156 @@ td {
   }
 
   h1 {
-    font-size: 2.4rem;
+    font-size: 2.1rem;
+    line-height: 1;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .hero,
+  .panel,
+  .plant-card,
+  .month-card {
+    border-radius: 28px;
+  }
+
+  .hero,
+  .panel,
+  .plant-card {
+    padding: 20px;
+  }
+
+  .hero {
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .hero .lede,
+  .compact-lede,
+  .task-note {
+    font-size: 0.98rem;
+  }
+
+  .month-picker,
+  .filters,
+  .chip-cloud,
+  .detail-pills,
+  .proposal-meta {
+    width: 100%;
+  }
+
+  .month-picker {
+    min-width: 0;
+  }
+
+  .stat-card {
+    padding: 16px 18px;
+  }
+
+  .stat-card strong {
+    font-size: 1.7rem;
+  }
+
+  .task-item,
+  .mini-item,
+  .workload-row,
+  .proposal-card,
+  .tip-card,
+  .week-block {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  .workload-row {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .panel-head,
+  .plant-card-head,
+  .month-card-head {
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .panel-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .panel-head a,
+  .button-link,
+  button {
+    width: 100%;
+  }
+
+  select,
+  input,
+  textarea,
+  button {
+    width: 100%;
+    padding: 15px 16px;
+    font-size: 1rem;
+  }
+
+  .editor-grid,
+  .proposal-grid,
+  .proposal-plant-picker {
+    gap: 10px;
+  }
+
+  .proposal-toggle {
+    align-items: flex-start;
+    line-height: 1.35;
+  }
+
+  .flash-stack {
+    margin-bottom: 4px;
+  }
+
+  .flash {
+    border-radius: 22px;
+    padding: 16px;
+  }
+
+  .mobile-tabbar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 20;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid rgba(32, 49, 39, 0.12);
+    border-radius: 24px;
+    background: rgba(255, 250, 242, 0.88);
+    backdrop-filter: blur(18px);
+    box-shadow: 0 18px 40px rgba(57, 62, 45, 0.18);
+  }
+
+  .mobile-tabbar a {
+    display: grid;
+    place-items: center;
+    min-height: 52px;
+    padding: 10px 6px;
+    border-radius: 18px;
+    color: var(--muted);
+    text-align: center;
+    font-size: 0.88rem;
+    line-height: 1.1;
+  }
+
+  .mobile-tabbar a.active {
+    color: var(--text);
+    background: var(--accent-soft);
+    font-weight: 700;
+  }
+
+  table {
+    min-width: 760px;
   }
 }
