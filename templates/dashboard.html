@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-  <section class="hero">
+  <section class="hero dashboard-hero">
     <div>
       <p class="eyebrow">Weekoverzicht</p>
       <h1>Dit vraagt deze week aandacht in de tuin.</h1>
@@ -24,7 +24,7 @@
     </form>
   </section>
 
-  <section class="stat-grid">
+  <section class="stat-grid dashboard-stat-grid">
     <article class="stat-card">
       <span>Planten in de app</span>
       <strong>{{ total_plants }}</strong>
@@ -43,10 +43,13 @@
     </article>
   </section>
 
-  <section class="dashboard-grid">
-    <article class="panel">
+  <section class="dashboard-grid dashboard-grid-primary">
+    <article class="panel dashboard-focus-panel">
       <div class="panel-head">
-        <h2>Wat er speelt in {{ selected_month }}, week {{ selected_week }}</h2>
+        <div>
+          <h2>Wat er speelt in {{ selected_month }}, week {{ selected_week }}</h2>
+          <p class="task-note panel-lede">Begin hier: dit zijn de taken die nu aandacht vragen.</p>
+        </div>
         <div class="panel-actions">
           <a class="button-link subtle" href="{{ url_for('dashboard', month=selected_month, week=selected_week, show_done=0 if show_done else 1) }}">
             {% if show_done %}Verberg afgeronde taken{% else %}Toon afgeronde taken{% endif %}
@@ -91,28 +94,9 @@
         {% endfor %}
       </div>
     </article>
-
-    <article class="panel">
-      <div class="panel-head">
-        <h2>Overzicht per plant</h2>
-        <a href="{{ url_for('plants') }}">Alle planten</a>
-      </div>
-      <div class="workload-list">
-        {% for item in workload %}
-          <a class="workload-row" href="{{ url_for('plant_detail', plant_name=item.plant) }}">
-            <span>{{ item.plant }}</span>
-            <span>{{ item.tasks }} taken</span>
-            <span>{{ item.open }} open</span>
-            <span>{{ item.high }} hoog</span>
-          </a>
-        {% else %}
-          <p class="empty-state">Nog geen plantoverzicht beschikbaar.</p>
-        {% endfor %}
-      </div>
-    </article>
   </section>
 
-  <section class="dashboard-grid secondary">
+  <section class="dashboard-grid dashboard-grid-priority">
     <article class="panel">
       <div class="panel-head">
         <div>
@@ -159,15 +143,21 @@
       {% if weather_forecast and weather_forecast.best_day %}
         <div class="weather-highlight weather-{{ weather_forecast.best_day.score_variant }}">
           <strong>Beste moment: {{ weather_forecast.best_day.label }}</strong>
-          <span>{{ weather_forecast.best_day.score_label }} · {{ weather_forecast.best_day.summary }}</span>
+          <span>{{ weather_forecast.best_day.score_label }} · {{ weather_forecast.best_day.reason }} · {{ weather_forecast.best_day.summary }}</span>
         </div>
         <div class="weather-grid">
           {% for day in weather_forecast.days %}
             <div class="weather-day weather-{{ day.score_variant }}">
               <strong>{{ day.label }}</strong>
               <span>{{ day.score_label }}</span>
+              <small>{{ day.reason }}</small>
               <small>{{ day.min_temp|round(0)|int if day.min_temp is not none else "-" }}° / {{ day.max_temp|round(0)|int if day.max_temp is not none else "-" }}°</small>
-              <small>{{ day.rain_probability if day.rain_probability is not none else "-" }}% regen · {{ day.wind_speed|round(0)|int if day.wind_speed is not none else "-" }} km/u</small>
+              <small>
+                {{ day.rain_probability if day.rain_probability is not none else "-" }}% regen
+                {% if day.rain_amount is not none %}· {{ '%.1f'|format(day.rain_amount) }} mm{% endif %}
+                · {{ day.wind_speed|round(0)|int if day.wind_speed is not none else "-" }} km/u
+                {% if day.uv_index is not none %}· UV {{ day.uv_index|round(0)|int }}{% endif %}
+              </small>
             </div>
           {% endfor %}
         </div>
@@ -177,23 +167,37 @@
         <p class="empty-state">Sla eerst je tuinlocatie op in de kaartweergave om hier tuinweer te zien.</p>
       {% endif %}
     </article>
+  </section>
 
-    <article class="panel">
+  <section class="dashboard-grid secondary dashboard-card-grid">
+    <article class="panel dashboard-side-panel">
       <div class="panel-head">
-        <h2>Verdeling van de taken</h2>
+        <div>
+          <h2>Overzicht per plant</h2>
+          <p class="task-note panel-lede">Zie snel waar het meeste werk nog openstaat.</p>
+        </div>
+        <a href="{{ url_for('plants') }}">Alle planten</a>
       </div>
-      <div class="chip-cloud">
-        {% if month_summary %}
-          {% for category, count in month_summary.categories.items() %}
-            <span class="chip">{{ category }} <strong>{{ count }}</strong></span>
-          {% endfor %}
-        {% endif %}
+      <div class="workload-list">
+        {% for item in workload %}
+          <a class="workload-row" href="{{ url_for('plant_detail', plant_name=item.plant) }}">
+            <span>{{ item.plant }}</span>
+            <span>{{ item.tasks }} taken</span>
+            <span>{{ item.open }} open</span>
+            <span>{{ item.high }} hoog</span>
+          </a>
+        {% else %}
+          <p class="empty-state">Nog geen plantoverzicht beschikbaar.</p>
+        {% endfor %}
       </div>
     </article>
 
     <article class="panel">
       <div class="panel-head">
-        <h2>Wat komt hierna</h2>
+        <div>
+          <h2>Wat komt hierna</h2>
+          <p class="task-note panel-lede">Kijk alvast vooruit naar de eerstvolgende aandachtspunten.</p>
+        </div>
       </div>
       <div class="mini-list">
         {% for task in next_up %}
@@ -212,6 +216,22 @@
             </form>
           </div>
         {% endfor %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Verdeling van de taken</h2>
+          <p class="task-note panel-lede">Handig om te zien welk soort werk deze maand het meeste voorkomt.</p>
+        </div>
+      </div>
+      <div class="chip-cloud">
+        {% if month_summary %}
+          {% for category, count in month_summary.categories.items() %}
+            <span class="chip">{{ category }} <strong>{{ count }}</strong></span>
+          {% endfor %}
+        {% endif %}
       </div>
     </article>
   </section>
