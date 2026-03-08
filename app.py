@@ -111,14 +111,25 @@ def _plants_with_stats() -> list[dict[str, object]]:
                 pin_variant = "high"
             elif highest_priority == PRIORITY_ORDER.get("Middel", 1):
                 pin_variant = "medium"
+        locations = plant.get("MapLocations", [])
         plants.append(
             {
                 **plant,
                 "Taken": len(related_tasks),
                 "OpenTaken": sum(task["Status"] != "Gereed" for task in related_tasks),
-                "MapPlaced": _as_percentage(plant.get("MapX")) is not None and _as_percentage(plant.get("MapY")) is not None,
+                "MapPlaced": bool(locations),
                 "MapXValue": _as_percentage(plant.get("MapX")),
                 "MapYValue": _as_percentage(plant.get("MapY")),
+                "MapLocations": [
+                    {
+                        **location,
+                        "x_value": _as_percentage(location.get("x")),
+                        "y_value": _as_percentage(location.get("y")),
+                    }
+                    for location in locations
+                    if _as_percentage(location.get("x")) is not None and _as_percentage(location.get("y")) is not None
+                ],
+                "LocationCount": len(locations),
                 "PinVariant": pin_variant,
             }
         )
@@ -656,11 +667,27 @@ def create_app() -> Flask:
         garden_map_settings = STORE.get_garden_map()
         placed_plants = [plant for plant in plants if plant["MapPlaced"]]
         unplaced_plants = [plant for plant in plants if not plant["MapPlaced"]]
+        map_pins = []
+        for plant in placed_plants:
+            for index, location in enumerate(plant["MapLocations"], start=1):
+                map_pins.append(
+                    {
+                        "plant": plant["Plant"],
+                        "location_id": location["id"],
+                        "label": location.get("label", ""),
+                        "x": location["x_value"],
+                        "y": location["y_value"],
+                        "pin_variant": plant["PinVariant"],
+                        "open_tasks": plant["OpenTaken"],
+                        "index": index,
+                    }
+                )
 
         return render_template(
             "map.html",
             page_title="Kaart",
             garden_map=garden_map_settings,
+            map_pins=map_pins,
             placed_plants=sorted(placed_plants, key=lambda plant: (-int(plant["OpenTaken"]), str(plant["Plant"]))),
             unplaced_plants=sorted(unplaced_plants, key=lambda plant: str(plant["Plant"])),
             plants=plants,
@@ -722,6 +749,7 @@ def create_app() -> Flask:
         plant_name = request.form.get("plant_name", "").strip()
         x = _as_percentage(request.form.get("map_x", ""))
         y = _as_percentage(request.form.get("map_y", ""))
+        location_label = request.form.get("location_label", "").strip()
 
         if not plant_name:
             flash("Kies eerst welke plant je wilt plaatsen.", "error")
@@ -731,13 +759,42 @@ def create_app() -> Flask:
             return redirect(url_for("garden_map"))
 
         try:
-            STORE.update_plant_location(plant_name, f"{x:.2f}", f"{y:.2f}")
+            STORE.update_plant_location(plant_name, f"{x:.2f}", f"{y:.2f}", location_label)
         except ValueError as exc:
             flash(str(exc), "error")
             return redirect(url_for("garden_map"))
 
         flash(f"{plant_name} staat nu op je tuinkaart.", "success")
         return redirect(url_for("garden_map"))
+
+    @app.post("/map/location/delete")
+    def delete_plant_map_location():
+        plant_name = request.form.get("plant_name", "").strip()
+        location_id = request.form.get("location_id", "").strip()
+        if not plant_name or not location_id:
+            flash("De gekozen locatie kon niet worden verwijderd.", "error")
+            return redirect(url_for("garden_map"))
+        try:
+            STORE.delete_plant_location(plant_name, location_id)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("garden_map"))
+        flash(f"Een plek van {plant_name} is van de kaart gehaald.", "success")
+        return redirect(url_for("garden_map"))
+
+    @app.post("/map/location/move")
+    def move_plant_map_location():
+        plant_name = request.form.get("plant_name", "").strip()
+        location_id = request.form.get("location_id", "").strip()
+        x = _as_percentage(request.form.get("map_x", ""))
+        y = _as_percentage(request.form.get("map_y", ""))
+        if not plant_name or not location_id or x is None or y is None:
+            return {"ok": False, "message": "Ongeldige kaartpositie."}, 400
+        try:
+            STORE.move_plant_location(plant_name, location_id, f"{x:.2f}", f"{y:.2f}")
+        except ValueError as exc:
+            return {"ok": False, "message": str(exc)}, 400
+        return {"ok": True, "x": f"{x:.2f}", "y": f"{y:.2f}"}, 200
 
     @app.post("/plants/create")
     def create_plant():

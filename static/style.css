@@ -806,6 +806,10 @@ td {
   border-radius: 999px;
   border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 10px 24px rgba(32, 49, 39, 0.18);
+  padding: 0;
+  min-width: 0;
+  color: white;
+  cursor: grab;
 }
 
 .garden-pin span {
@@ -846,7 +850,18 @@ td {
   pointer-events: none;
 }
 
+.garden-pin-dragging {
+  cursor: grabbing;
+  box-shadow: 0 14px 30px rgba(32, 49, 39, 0.28);
+  transform: scale(1.05);
+}
+
 .map-plant-list {
+  display: grid;
+  gap: 10px;
+}
+
+.map-plant-group {
   display: grid;
   gap: 10px;
 }
@@ -895,6 +910,32 @@ td {
 .map-plant-meta {
   color: var(--muted);
   font-size: 0.95rem;
+}
+
+.map-location-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.map-location-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.map-location-remove {
+  width: auto;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--text);
 }
 
 .map-empty-state {
@@ -1116,6 +1157,11 @@ td {
   .toggle-field {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .garden-pin,
+  .map-location-remove {
+    width: auto;
   }
 
   select,

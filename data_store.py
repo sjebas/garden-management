@@ -20,6 +20,25 @@ def _clean(value: object) -> str:
     return str(value).strip()
 
 
+def _normalize_locations(values: object, fallback_x: object = "", fallback_y: object = "") -> list[dict[str, str]]:
+    raw_locations = values if isinstance(values, list) else []
+    normalized = []
+    for item in raw_locations:
+        if not isinstance(item, dict):
+            continue
+        x = _clean(item.get("x", ""))
+        y = _clean(item.get("y", ""))
+        label = _clean(item.get("label", ""))
+        if x and y:
+            normalized.append({"id": _clean(item.get("id", uuid4().hex)) or uuid4().hex, "x": x, "y": y, "label": label})
+
+    legacy_x = _clean(fallback_x)
+    legacy_y = _clean(fallback_y)
+    if not normalized and legacy_x and legacy_y:
+        normalized.append({"id": uuid4().hex, "x": legacy_x, "y": legacy_y, "label": ""})
+    return normalized
+
+
 def _task_sort_key(task: dict[str, str]) -> tuple[int, int, int, str]:
     month_order = {
         "Januari": 0,
@@ -46,6 +65,7 @@ def _task_sort_key(task: dict[str, str]) -> tuple[int, int, int, str]:
 
 
 def _default_plant_record(values: dict[str, str], plant_id: str | None = None) -> dict[str, str]:
+    locations = _normalize_locations(values.get("MapLocations"), values.get("MapX", ""), values.get("MapY", ""))
     return {
         "id": plant_id or uuid4().hex,
         "Plant": values.get("Plant", ""),
@@ -54,8 +74,9 @@ def _default_plant_record(values: dict[str, str], plant_id: str | None = None) -
         "Standplaats": values.get("Standplaats", ""),
         "Winterhard": values.get("Winterhard", ""),
         "Notitie": values.get("Notitie", ""),
-        "MapX": _clean(values.get("MapX", "")),
-        "MapY": _clean(values.get("MapY", "")),
+        "MapX": locations[0]["x"] if locations else _clean(values.get("MapX", "")),
+        "MapY": locations[0]["y"] if locations else _clean(values.get("MapY", "")),
+        "MapLocations": locations,
     }
 
 
@@ -136,7 +157,15 @@ class BaseStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+    def update_plant_location(self, name: str, x: str, y: str, label: str = "") -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_plant_location(self, name: str, location_id: str) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def move_plant_location(self, name: str, location_id: str, x: str, y: str) -> dict[str, str]:
         raise NotImplementedError
 
 
@@ -220,7 +249,7 @@ class FileStore(BaseStore):
         remaining_plants = [item for item in payload["plants"] if item["id"] != plant["id"]]
         removed_tasks = [task for task in payload["tasks"] if task["PlantId"] == plant["id"]]
         remaining_tasks = [task for task in payload["tasks"] if task["PlantId"] != plant["id"]]
-        self._write({"plants": remaining_plants, "tasks": remaining_tasks})
+        self._write({"plants": remaining_plants, "tasks": remaining_tasks, "garden_map": payload["garden_map"]})
         return plant, len(removed_tasks)
 
     def ensure_plant(self, name: str) -> dict[str, str]:
@@ -271,15 +300,50 @@ class FileStore(BaseStore):
         self._write(payload)
         return record
 
-    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+    def update_plant_location(self, name: str, x: str, y: str, label: str = "") -> dict[str, str]:
         payload = self._read()
         plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
         if plant is None:
             raise ValueError(f"Plant niet gevonden: {name}")
-        plant["MapX"] = _clean(x)
-        plant["MapY"] = _clean(y)
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        locations.append({"id": uuid4().hex, "x": _clean(x), "y": _clean(y), "label": _clean(label)})
+        plant["MapLocations"] = locations
+        plant["MapX"] = locations[0]["x"]
+        plant["MapY"] = locations[0]["y"]
         self._write(payload)
         return plant
+
+    def delete_plant_location(self, name: str, location_id: str) -> dict[str, str]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        remaining = [item for item in locations if item["id"] != location_id]
+        if len(remaining) == len(locations):
+            raise ValueError("Locatie niet gevonden.")
+        plant["MapLocations"] = remaining
+        plant["MapX"] = remaining[0]["x"] if remaining else ""
+        plant["MapY"] = remaining[0]["y"] if remaining else ""
+        self._write(payload)
+        return plant
+
+    def move_plant_location(self, name: str, location_id: str, x: str, y: str) -> dict[str, str]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        for location in locations:
+            if location["id"] == location_id:
+                location["x"] = _clean(x)
+                location["y"] = _clean(y)
+                plant["MapLocations"] = locations
+                plant["MapX"] = locations[0]["x"] if locations else ""
+                plant["MapY"] = locations[0]["y"] if locations else ""
+                self._write(payload)
+                return plant
+        raise ValueError("Locatie niet gevonden.")
 
     def _read(self) -> dict[str, list[dict[str, str]]]:
         if not self.path.exists():
@@ -289,6 +353,7 @@ class FileStore(BaseStore):
         payload.setdefault("tasks", [])
         payload.setdefault("garden_map", _default_garden_map_record({}))
         for plant in payload["plants"]:
+            plant["MapLocations"] = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
             plant.setdefault("MapX", "")
             plant.setdefault("MapY", "")
         return payload
@@ -334,7 +399,14 @@ class FirestoreStore(BaseStore):
         batch.commit()
 
     def list_plants(self) -> list[dict[str, str]]:
-        return [{**doc.to_dict(), "MapX": _clean(doc.to_dict().get("MapX", "")), "MapY": _clean(doc.to_dict().get("MapY", ""))} for doc in self.plants_collection.stream()]
+        items = []
+        for doc in self.plants_collection.stream():
+            payload = doc.to_dict()
+            payload["MapLocations"] = _normalize_locations(payload.get("MapLocations"), payload.get("MapX", ""), payload.get("MapY", ""))
+            payload["MapX"] = payload["MapLocations"][0]["x"] if payload["MapLocations"] else _clean(payload.get("MapX", ""))
+            payload["MapY"] = payload["MapLocations"][0]["y"] if payload["MapLocations"] else _clean(payload.get("MapY", ""))
+            items.append(payload)
+        return items
 
     def list_tasks(self) -> list[dict[str, str]]:
         return [doc.to_dict() for doc in self.tasks_collection.stream()]
@@ -428,14 +500,47 @@ class FirestoreStore(BaseStore):
         self.settings_collection.document("garden_map").set(payload)
         return payload
 
-    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+    def update_plant_location(self, name: str, x: str, y: str, label: str = "") -> dict[str, str]:
         plant = self.get_plant_by_name(name)
         if plant is None:
             raise ValueError(f"Plant niet gevonden: {name}")
-        plant["MapX"] = _clean(x)
-        plant["MapY"] = _clean(y)
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        locations.append({"id": uuid4().hex, "x": _clean(x), "y": _clean(y), "label": _clean(label)})
+        plant["MapLocations"] = locations
+        plant["MapX"] = locations[0]["x"]
+        plant["MapY"] = locations[0]["y"]
         self.plants_collection.document(plant["id"]).set(plant)
         return plant
+
+    def delete_plant_location(self, name: str, location_id: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        remaining = [item for item in locations if item["id"] != location_id]
+        if len(remaining) == len(locations):
+            raise ValueError("Locatie niet gevonden.")
+        plant["MapLocations"] = remaining
+        plant["MapX"] = remaining[0]["x"] if remaining else ""
+        plant["MapY"] = remaining[0]["y"] if remaining else ""
+        self.plants_collection.document(plant["id"]).set(plant)
+        return plant
+
+    def move_plant_location(self, name: str, location_id: str, x: str, y: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        locations = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
+        for location in locations:
+            if location["id"] == location_id:
+                location["x"] = _clean(x)
+                location["y"] = _clean(y)
+                plant["MapLocations"] = locations
+                plant["MapX"] = locations[0]["x"] if locations else ""
+                plant["MapY"] = locations[0]["y"] if locations else ""
+                self.plants_collection.document(plant["id"]).set(plant)
+                return plant
+        raise ValueError("Locatie niet gevonden.")
 
 
 def create_store(backend: str, file_path: Path, project_id: str | None, prefix: str) -> BaseStore:

@@ -14,7 +14,7 @@
       <div class="panel-head">
         <div>
           <h2>Kaart van de tuin</h2>
-          <p class="task-note">Rood = hoge prioriteit, goud = middel, groen = rustig, zacht = alleen afgerond.</p>
+          <p class="task-note">Rood = hoge prioriteit, goud = middel, groen = rustig, zacht = alleen afgerond. Sleep een pin om een plant te verplaatsen.</p>
         </div>
       </div>
 
@@ -26,6 +26,7 @@
               <option value="{{ plant.Plant }}">{{ plant.Plant }}</option>
             {% endfor %}
           </select>
+          <input type="text" name="location_label" placeholder="Optioneel: bijvoorbeeld voortuin of border links">
           <input type="hidden" name="map_x" id="map-x-input">
           <input type="hidden" name="map_y" id="map-y-input">
           <div class="map-position-readout" id="map-position-readout">Klik op de kaart om een plek te kiezen.</div>
@@ -35,15 +36,18 @@
         <div class="garden-map-stage">
           <div class="garden-map-surface" id="garden-map-surface">
             <img src="{{ url_for('garden_map_background') }}" alt="Kaart van de tuin">
-            {% for plant in placed_plants %}
-              <a
-                class="garden-pin garden-pin-{{ plant.PinVariant }}"
-                href="{{ url_for('plant_detail', plant_name=plant.Plant) }}"
-                style="left: {{ '%.2f'|format(plant.MapXValue) }}%; top: {{ '%.2f'|format(plant.MapYValue) }}%;"
-                title="{{ plant.Plant }} - {{ plant.OpenTaken }} open taken"
+            {% for pin in map_pins %}
+              <button
+                type="button"
+                class="garden-pin garden-pin-{{ pin.pin_variant }}"
+                style="left: {{ '%.2f'|format(pin.x) }}%; top: {{ '%.2f'|format(pin.y) }}%;"
+                title="{{ pin.plant }}{% if pin.label %} - {{ pin.label }}{% endif %}"
+                data-plant-name="{{ pin.plant }}"
+                data-location-id="{{ pin.location_id }}"
+                data-move-url="{{ url_for('move_plant_map_location') }}"
               >
-                <span>{{ plant.Plant[:1] }}</span>
-              </a>
+                <span>{{ pin.plant[:1] }}</span>
+              </button>
             {% endfor %}
             <span class="garden-pin garden-pin-preview" id="garden-pin-preview" hidden><span>+</span></span>
           </div>
@@ -74,16 +78,34 @@
         <div class="panel-head">
           <div>
             <h2>Al geplaatst</h2>
-            <p class="task-note">{{ placed_plants|length }} planten hebben al een plek op de kaart.</p>
+            <p class="task-note">{{ map_pins|length }} plekken staan al op de kaart.</p>
           </div>
         </div>
         <div class="map-plant-list">
           {% for plant in placed_plants %}
-            <a class="map-plant-row" href="{{ url_for('plant_detail', plant_name=plant.Plant) }}">
-              <span class="map-plant-dot map-plant-dot-{{ plant.PinVariant }}"></span>
-              <span class="map-plant-name">{{ plant.Plant }}</span>
-              <span class="map-plant-meta">{{ plant.OpenTaken }} open</span>
-            </a>
+            <div class="map-plant-group">
+              <a class="map-plant-row" href="{{ url_for('plant_detail', plant_name=plant.Plant) }}">
+                <span class="map-plant-dot map-plant-dot-{{ plant.PinVariant }}"></span>
+                <span class="map-plant-name">{{ plant.Plant }}</span>
+                <span class="map-plant-meta">{{ plant.LocationCount }} plek{% if plant.LocationCount != 1 %}ken{% endif %} · {{ plant.OpenTaken }} open</span>
+              </a>
+              <div class="map-location-list">
+                {% for location in plant.MapLocations %}
+                  <form method="post" action="{{ url_for('delete_plant_map_location') }}" class="map-location-chip">
+                    <input type="hidden" name="plant_name" value="{{ plant.Plant }}">
+                    <input type="hidden" name="location_id" value="{{ location.id }}">
+                    <span>
+                      {% if location.label %}
+                        {{ location.label }}
+                      {% else %}
+                        Plek {{ loop.index }}
+                      {% endif %}
+                    </span>
+                    <button type="submit" class="map-location-remove" aria-label="Verwijder plek">Verwijder</button>
+                  </form>
+                {% endfor %}
+              </div>
+            </div>
           {% else %}
             <p class="empty-state">Nog geen planten geplaatst.</p>
           {% endfor %}
@@ -119,20 +141,28 @@
       const previewPin = document.getElementById("garden-pin-preview");
       const readout = document.getElementById("map-position-readout");
       const saveButton = document.getElementById("map-save-button");
+      let dragState = null;
 
       if (!mapSurface || !xInput || !yInput || !previewPin || !readout || !saveButton) {
         return;
       }
 
+      const positionFromEvent = (event) => {
+        const rect = mapSurface.getBoundingClientRect();
+        const pointer = event.touches ? event.touches[0] : event;
+        const x = ((pointer.clientX - rect.left) / rect.width) * 100;
+        const y = ((pointer.clientY - rect.top) / rect.height) * 100;
+        return {
+          x: Math.max(0, Math.min(100, x)),
+          y: Math.max(0, Math.min(100, y)),
+        };
+      };
+
       mapSurface.addEventListener("click", (event) => {
         if (event.target.closest(".garden-pin")) {
           return;
         }
-        const rect = mapSurface.getBoundingClientRect();
-        const x = ((event.clientX - rect.left) / rect.width) * 100;
-        const y = ((event.clientY - rect.top) / rect.height) * 100;
-        const boundedX = Math.max(0, Math.min(100, x));
-        const boundedY = Math.max(0, Math.min(100, y));
+        const { x: boundedX, y: boundedY } = positionFromEvent(event);
 
         xInput.value = boundedX.toFixed(2);
         yInput.value = boundedY.toFixed(2);
@@ -141,6 +171,70 @@
         previewPin.hidden = false;
         readout.textContent = `Gekozen plek: ${boundedX.toFixed(1)}% van links, ${boundedY.toFixed(1)}% van boven`;
         saveButton.disabled = false;
+      });
+
+      const saveMovedPin = async () => {
+        if (!dragState) {
+          return;
+        }
+        const payload = new URLSearchParams({
+          plant_name: dragState.plantName,
+          location_id: dragState.locationId,
+          map_x: dragState.x.toFixed(2),
+          map_y: dragState.y.toFixed(2),
+        });
+
+        try {
+          const response = await fetch(dragState.moveUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+            body: payload.toString(),
+          });
+          if (!response.ok) {
+            throw new Error("Kon de nieuwe plek niet opslaan.");
+          }
+          readout.textContent = `${dragState.plantName} staat nu op ${dragState.x.toFixed(1)}% / ${dragState.y.toFixed(1)}%.`;
+        } catch (error) {
+          readout.textContent = "De nieuwe plek kon niet worden opgeslagen.";
+        }
+      };
+
+      mapSurface.querySelectorAll(".garden-pin[data-location-id]").forEach((pin) => {
+        const startDrag = (event) => {
+          event.preventDefault();
+          const { x, y } = positionFromEvent(event);
+          dragState = {
+            pin,
+            x,
+            y,
+            plantName: pin.dataset.plantName,
+            locationId: pin.dataset.locationId,
+            moveUrl: pin.dataset.moveUrl,
+          };
+          pin.classList.add("garden-pin-dragging");
+        };
+
+        pin.addEventListener("pointerdown", startDrag);
+      });
+
+      window.addEventListener("pointermove", (event) => {
+        if (!dragState) {
+          return;
+        }
+        const { x, y } = positionFromEvent(event);
+        dragState.x = x;
+        dragState.y = y;
+        dragState.pin.style.left = `${x.toFixed(2)}%`;
+        dragState.pin.style.top = `${y.toFixed(2)}%`;
+      });
+
+      window.addEventListener("pointerup", async () => {
+        if (!dragState) {
+          return;
+        }
+        dragState.pin.classList.remove("garden-pin-dragging");
+        await saveMovedPin();
+        dragState = null;
       });
     })();
   </script>
