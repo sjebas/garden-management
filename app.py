@@ -9,10 +9,13 @@ from pathlib import Path
 import re
 import secrets
 from math import ceil
+from io import BytesIO
 
-from flask import Flask, abort, flash, redirect, render_template, request, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, send_file, url_for
+from werkzeug.utils import secure_filename
 
 from data_store import create_store, generate_task_id
+from garden_map_assets import GardenMapAssetStore
 from gemini_helper import GeminiError, GeminiQuotaError, analyze_plant_image
 from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, GardenWorkbook
 
@@ -22,6 +25,7 @@ SEED_WORKBOOK_PATH = BASE_DIR / "professioneel_tuinbeheer_snoeiplan_verrijkt.xls
 LOCAL_DATA_PATH = Path(
     os.getenv("GARDEN_FILE_STORE_PATH", str(BASE_DIR / "instance" / "garden-data.json"))
 )
+LOCAL_MAP_ASSET_PATH = BASE_DIR / "instance" / "garden-map-assets"
 TASK_FIELDS = [
     "ID",
     "Plant",
@@ -59,6 +63,10 @@ STORE = create_store(
     project_id=os.getenv("FIRESTORE_PROJECT_ID", "").strip() or None,
     prefix=os.getenv("FIRESTORE_COLLECTION_PREFIX", "garden"),
 )
+MAP_ASSET_STORE = GardenMapAssetStore(
+    local_dir=LOCAL_MAP_ASSET_PATH,
+    bucket_name=os.getenv("GARDEN_MAP_BUCKET", "").strip() or None,
+)
 
 
 def _seed_store() -> None:
@@ -76,16 +84,42 @@ def _plant_form_values(form) -> dict[str, str]:
     return {field: form.get(field, "").strip() for field in PLANT_FIELDS}
 
 
+def _as_percentage(value: object) -> float | None:
+    try:
+        parsed = float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if 0 <= parsed <= 100:
+        return round(parsed, 2)
+    return None
+
+
 def _plants_with_stats() -> list[dict[str, object]]:
     tasks = STORE.list_tasks()
     plants = []
     for plant in STORE.list_plants():
         related_tasks = [task for task in tasks if task["PlantId"] == plant["id"]]
+        open_tasks = [task for task in related_tasks if task["Status"] != "Gereed"]
+        highest_priority = min(
+            (PRIORITY_ORDER.get(task["Prioriteit"], 99) for task in open_tasks),
+            default=99,
+        )
+        pin_variant = "done"
+        if open_tasks:
+            pin_variant = "low"
+            if highest_priority == PRIORITY_ORDER.get("Hoog", 0):
+                pin_variant = "high"
+            elif highest_priority == PRIORITY_ORDER.get("Middel", 1):
+                pin_variant = "medium"
         plants.append(
             {
                 **plant,
                 "Taken": len(related_tasks),
                 "OpenTaken": sum(task["Status"] != "Gereed" for task in related_tasks),
+                "MapPlaced": _as_percentage(plant.get("MapX")) is not None and _as_percentage(plant.get("MapY")) is not None,
+                "MapXValue": _as_percentage(plant.get("MapX")),
+                "MapYValue": _as_percentage(plant.get("MapY")),
+                "PinVariant": pin_variant,
             }
         )
     return sorted(plants, key=lambda plant: str(plant["Plant"]))
@@ -615,6 +649,95 @@ def create_app() -> Flask:
             proposal_result=None,
             proposal_reference=reference,
         )
+
+    @app.route("/map")
+    def garden_map():
+        plants = _plants_with_stats()
+        garden_map_settings = STORE.get_garden_map()
+        placed_plants = [plant for plant in plants if plant["MapPlaced"]]
+        unplaced_plants = [plant for plant in plants if not plant["MapPlaced"]]
+
+        return render_template(
+            "map.html",
+            page_title="Kaart",
+            garden_map=garden_map_settings,
+            placed_plants=sorted(placed_plants, key=lambda plant: (-int(plant["OpenTaken"]), str(plant["Plant"]))),
+            unplaced_plants=sorted(unplaced_plants, key=lambda plant: str(plant["Plant"])),
+            plants=plants,
+        )
+
+    @app.post("/map/background")
+    def upload_garden_map_background():
+        image = request.files.get("background_image")
+        if image is None or not image.filename:
+            flash("Kies eerst een afbeelding van je tuin.", "error")
+            return redirect(url_for("garden_map"))
+        if os.getenv("K_SERVICE") and not os.getenv("GARDEN_MAP_BUCKET", "").strip():
+            flash("Voor de tuinkaart in de cloud is eerst een opslagbucket nodig.", "error")
+            return redirect(url_for("garden_map"))
+
+        mime_type = image.mimetype or mimetypes.guess_type(image.filename)[0] or ""
+        if not mime_type.startswith("image/"):
+            flash("Gebruik een afbeeldingsbestand voor de kaartachtergrond.", "error")
+            return redirect(url_for("garden_map"))
+
+        image_bytes = image.read()
+        if not image_bytes:
+            flash("De gekozen kaartafbeelding is leeg.", "error")
+            return redirect(url_for("garden_map"))
+
+        try:
+            saved = MAP_ASSET_STORE.save_background(
+                filename=secure_filename(image.filename),
+                data=image_bytes,
+                mime_type=mime_type,
+            )
+            STORE.save_garden_map(
+                {
+                    "BackgroundPath": saved.path,
+                    "BackgroundMimeType": saved.mime_type,
+                    "UpdatedAt": datetime.utcnow().isoformat(),
+                }
+            )
+        except RuntimeError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("garden_map"))
+
+        flash("De tuinfoto staat klaar als achtergrond van je kaart.", "success")
+        return redirect(url_for("garden_map"))
+
+    @app.get("/map/background")
+    def garden_map_background():
+        settings = STORE.get_garden_map()
+        if not settings.get("BackgroundPath"):
+            abort(404)
+        try:
+            data, mime_type = MAP_ASSET_STORE.load_background(settings["BackgroundPath"])
+        except FileNotFoundError:
+            abort(404)
+        return send_file(BytesIO(data), mimetype=settings.get("BackgroundMimeType") or mime_type, max_age=300)
+
+    @app.post("/map/place")
+    def place_plant_on_map():
+        plant_name = request.form.get("plant_name", "").strip()
+        x = _as_percentage(request.form.get("map_x", ""))
+        y = _as_percentage(request.form.get("map_y", ""))
+
+        if not plant_name:
+            flash("Kies eerst welke plant je wilt plaatsen.", "error")
+            return redirect(url_for("garden_map"))
+        if x is None or y is None:
+            flash("Klik op de kaart om een geldige plek te kiezen.", "error")
+            return redirect(url_for("garden_map"))
+
+        try:
+            STORE.update_plant_location(plant_name, f"{x:.2f}", f"{y:.2f}")
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("garden_map"))
+
+        flash(f"{plant_name} staat nu op je tuinkaart.", "success")
+        return redirect(url_for("garden_map"))
 
     @app.post("/plants/create")
     def create_plant():

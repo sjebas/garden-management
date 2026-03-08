@@ -60,6 +60,7 @@ Belangrijk:
 - Voor de foto-assistent moet `GEMINI_API_KEY` als environment variable beschikbaar zijn.
 - In productie wordt `GEMINI_API_KEY` via Secret Manager gekoppeld met secretnaam `gemini-api-key`.
 - De app gebruikt standaard deze modelvolgorde voor slimme invoer: `gemini-3.1-flash-lite-preview`, `gemini-2.5-flash`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`.
+- Voor de tuinkaart gebruikt de app lokaal een bestand in `instance/`, maar in Cloud Run is een bucket via `GARDEN_MAP_BUCKET` nodig om de achtergrondafbeelding blijvend op te slaan.
 
 ## Cloud Run trigger
 

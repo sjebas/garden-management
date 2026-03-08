@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section-heading">
+    <div>
+      <p class="eyebrow">Tuinkaart</p>
+      <h1>Zie in een oogopslag waar je werk wacht.</h1>
+      <p class="lede compact-lede">Upload een foto of schets van de tuin, kies een plant en klik op de plek waar die staat. De pin kleur laat zien waar aandacht nodig is.</p>
+    </div>
+  </section>
+
+  <section class="map-layout">
+    <section class="panel map-canvas-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Kaart van de tuin</h2>
+          <p class="task-note">Rood = hoge prioriteit, goud = middel, groen = rustig, zacht = alleen afgerond.</p>
+        </div>
+      </div>
+
+      {% if garden_map.BackgroundPath %}
+        <form method="post" action="{{ url_for('place_plant_on_map') }}" class="map-controls" id="map-place-form">
+          <select name="plant_name" id="map-plant-select" required>
+            <option value="">Kies een plant om te plaatsen</option>
+            {% for plant in plants %}
+              <option value="{{ plant.Plant }}">{{ plant.Plant }}</option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="map_x" id="map-x-input">
+          <input type="hidden" name="map_y" id="map-y-input">
+          <div class="map-position-readout" id="map-position-readout">Klik op de kaart om een plek te kiezen.</div>
+          <button type="submit" id="map-save-button" disabled>Plant opslaan op deze plek</button>
+        </form>
+
+        <div class="garden-map-stage">
+          <div class="garden-map-surface" id="garden-map-surface">
+            <img src="{{ url_for('garden_map_background') }}" alt="Kaart van de tuin">
+            {% for plant in placed_plants %}
+              <a
+                class="garden-pin garden-pin-{{ plant.PinVariant }}"
+                href="{{ url_for('plant_detail', plant_name=plant.Plant) }}"
+                style="left: {{ '%.2f'|format(plant.MapXValue) }}%; top: {{ '%.2f'|format(plant.MapYValue) }}%;"
+                title="{{ plant.Plant }} - {{ plant.OpenTaken }} open taken"
+              >
+                <span>{{ plant.Plant[:1] }}</span>
+              </a>
+            {% endfor %}
+            <span class="garden-pin garden-pin-preview" id="garden-pin-preview" hidden><span>+</span></span>
+          </div>
+        </div>
+      {% else %}
+        <div class="map-empty-state">
+          <h2>Voeg eerst een tuinfoto toe</h2>
+          <p class="task-note">Een simpele schets, screenshot of top-down foto werkt prima als achtergrond.</p>
+        </div>
+      {% endif %}
+    </section>
+
+    <aside class="map-sidebar">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Achtergrond uploaden</h2>
+            <p class="task-note">Je kunt later altijd een nieuw beeld uploaden.</p>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('upload_garden_map_background') }}" enctype="multipart/form-data" class="editor-grid">
+          <input type="file" name="background_image" accept="image/*" required>
+          <button type="submit">Gebruik als tuinkaart</button>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Al geplaatst</h2>
+            <p class="task-note">{{ placed_plants|length }} planten hebben al een plek op de kaart.</p>
+          </div>
+        </div>
+        <div class="map-plant-list">
+          {% for plant in placed_plants %}
+            <a class="map-plant-row" href="{{ url_for('plant_detail', plant_name=plant.Plant) }}">
+              <span class="map-plant-dot map-plant-dot-{{ plant.PinVariant }}"></span>
+              <span class="map-plant-name">{{ plant.Plant }}</span>
+              <span class="map-plant-meta">{{ plant.OpenTaken }} open</span>
+            </a>
+          {% else %}
+            <p class="empty-state">Nog geen planten geplaatst.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Nog te plaatsen</h2>
+            <p class="task-note">Kies er een bovenaan en klik daarna op de kaart.</p>
+          </div>
+        </div>
+        <div class="map-plant-list">
+          {% for plant in unplaced_plants %}
+            <div class="map-plant-row static-row">
+              <span class="map-plant-name">{{ plant.Plant }}</span>
+              <span class="map-plant-meta">{{ plant.OpenTaken }} open</span>
+            </div>
+          {% else %}
+            <p class="empty-state">Alle planten hebben al een plek op de kaart.</p>
+          {% endfor %}
+        </div>
+      </section>
+    </aside>
+  </section>
+
+  <script>
+    (() => {
+      const mapSurface = document.getElementById("garden-map-surface");
+      const xInput = document.getElementById("map-x-input");
+      const yInput = document.getElementById("map-y-input");
+      const previewPin = document.getElementById("garden-pin-preview");
+      const readout = document.getElementById("map-position-readout");
+      const saveButton = document.getElementById("map-save-button");
+
+      if (!mapSurface || !xInput || !yInput || !previewPin || !readout || !saveButton) {
+        return;
+      }
+
+      mapSurface.addEventListener("click", (event) => {
+        if (event.target.closest(".garden-pin")) {
+          return;
+        }
+        const rect = mapSurface.getBoundingClientRect();
+        const x = ((event.clientX - rect.left) / rect.width) * 100;
+        const y = ((event.clientY - rect.top) / rect.height) * 100;
+        const boundedX = Math.max(0, Math.min(100, x));
+        const boundedY = Math.max(0, Math.min(100, y));
+
+        xInput.value = boundedX.toFixed(2);
+        yInput.value = boundedY.toFixed(2);
+        previewPin.style.left = `${boundedX.toFixed(2)}%`;
+        previewPin.style.top = `${boundedY.toFixed(2)}%`;
+        previewPin.hidden = false;
+        readout.textContent = `Gekozen plek: ${boundedX.toFixed(1)}% van links, ${boundedY.toFixed(1)}% van boven`;
+        saveButton.disabled = false;
+      });
+    })();
+  </script>
+{% endblock %}

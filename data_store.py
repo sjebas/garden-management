@@ -54,6 +54,8 @@ def _default_plant_record(values: dict[str, str], plant_id: str | None = None) -
         "Standplaats": values.get("Standplaats", ""),
         "Winterhard": values.get("Winterhard", ""),
         "Notitie": values.get("Notitie", ""),
+        "MapX": _clean(values.get("MapX", "")),
+        "MapY": _clean(values.get("MapY", "")),
     }
 
 
@@ -125,6 +127,18 @@ class BaseStore(ABC):
     def update_task_status(self, task_id: str, status: str) -> dict[str, str]:
         raise NotImplementedError
 
+    @abstractmethod
+    def get_garden_map(self) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def save_garden_map(self, values: dict[str, str]) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+        raise NotImplementedError
+
 
 class FileStore(BaseStore):
     def __init__(self, path: Path) -> None:
@@ -149,7 +163,7 @@ class FileStore(BaseStore):
                 plant_id = plant["id"]
             seeded_tasks.append(_default_task_record(item, plant_id))
 
-        payload = {"plants": seeded_plants, "tasks": seeded_tasks}
+        payload = {"plants": seeded_plants, "tasks": seeded_tasks, "garden_map": _default_garden_map_record({})}
         self._write(payload)
 
     def list_plants(self) -> list[dict[str, str]]:
@@ -189,7 +203,8 @@ class FileStore(BaseStore):
         if duplicate is not None:
             raise ValueError(f"Plant bestaat al: {values['Plant']}")
 
-        plant.update(_default_plant_record(values, plant["id"]))
+        merged_values = {**plant, **values}
+        plant.update(_default_plant_record(merged_values, plant["id"]))
         for task in payload["tasks"]:
             if task["PlantId"] == plant["id"]:
                 task["Plant"] = plant["Plant"]
@@ -246,12 +261,39 @@ class FileStore(BaseStore):
         self._write(payload)
         return task
 
+    def get_garden_map(self) -> dict[str, str]:
+        return self._read()["garden_map"]
+
+    def save_garden_map(self, values: dict[str, str]) -> dict[str, str]:
+        payload = self._read()
+        record = _default_garden_map_record({**payload["garden_map"], **values})
+        payload["garden_map"] = record
+        self._write(payload)
+        return record
+
+    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        plant["MapX"] = _clean(x)
+        plant["MapY"] = _clean(y)
+        self._write(payload)
+        return plant
+
     def _read(self) -> dict[str, list[dict[str, str]]]:
         if not self.path.exists():
-            return {"plants": [], "tasks": []}
-        return json.loads(self.path.read_text(encoding="utf-8"))
+            return {"plants": [], "tasks": [], "garden_map": _default_garden_map_record({})}
+        payload = json.loads(self.path.read_text(encoding="utf-8"))
+        payload.setdefault("plants", [])
+        payload.setdefault("tasks", [])
+        payload.setdefault("garden_map", _default_garden_map_record({}))
+        for plant in payload["plants"]:
+            plant.setdefault("MapX", "")
+            plant.setdefault("MapY", "")
+        return payload
 
-    def _write(self, payload: dict[str, list[dict[str, str]]]) -> None:
+    def _write(self, payload: dict[str, object]) -> None:
         with self._lock:
             self.path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
 
@@ -264,6 +306,7 @@ class FirestoreStore(BaseStore):
         self.prefix = collection_prefix.strip() or "garden"
         self.plants_collection = self.client.collection(f"{self.prefix}_plants")
         self.tasks_collection = self.client.collection(f"{self.prefix}_tasks")
+        self.settings_collection = self.client.collection(f"{self.prefix}_settings")
 
     def ensure_seeded(self, plants: list[dict[str, str]], tasks: list[dict[str, str]]) -> None:
         if list(self.plants_collection.limit(1).stream()):
@@ -291,7 +334,7 @@ class FirestoreStore(BaseStore):
         batch.commit()
 
     def list_plants(self) -> list[dict[str, str]]:
-        return [doc.to_dict() for doc in self.plants_collection.stream()]
+        return [{**doc.to_dict(), "MapX": _clean(doc.to_dict().get("MapX", "")), "MapY": _clean(doc.to_dict().get("MapY", ""))} for doc in self.plants_collection.stream()]
 
     def list_tasks(self) -> list[dict[str, str]]:
         return [doc.to_dict() for doc in self.tasks_collection.stream()]
@@ -320,7 +363,7 @@ class FirestoreStore(BaseStore):
         if duplicate is not None and duplicate["id"] != plant["id"]:
             raise ValueError(f"Plant bestaat al: {values['Plant']}")
 
-        updated = _default_plant_record(values, plant["id"])
+        updated = _default_plant_record({**plant, **values}, plant["id"])
         batch = self.client.batch()
         batch.set(self.plants_collection.document(plant["id"]), updated)
         for doc in self.tasks_collection.where("PlantId", "==", plant["id"]).stream():
@@ -374,6 +417,26 @@ class FirestoreStore(BaseStore):
         self.tasks_collection.document(task_id).set(task)
         return task
 
+    def get_garden_map(self) -> dict[str, str]:
+        doc = self.settings_collection.document("garden_map").get()
+        payload = doc.to_dict() if doc.exists else {}
+        return _default_garden_map_record(payload)
+
+    def save_garden_map(self, values: dict[str, str]) -> dict[str, str]:
+        current = self.get_garden_map()
+        payload = _default_garden_map_record({**current, **values})
+        self.settings_collection.document("garden_map").set(payload)
+        return payload
+
+    def update_plant_location(self, name: str, x: str, y: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        plant["MapX"] = _clean(x)
+        plant["MapY"] = _clean(y)
+        self.plants_collection.document(plant["id"]).set(plant)
+        return plant
+
 
 def create_store(backend: str, file_path: Path, project_id: str | None, prefix: str) -> BaseStore:
     if backend == "firestore":
@@ -388,3 +451,11 @@ def generate_task_id(existing_ids: list[str], plant_name: str) -> str:
     numbers = [int(match.group(1)) for value in existing_ids if (match := pattern.match(value))]
     next_number = (max(numbers) + 1) if numbers else 1
     return f"{base}-{next_number:02d}"
+
+
+def _default_garden_map_record(values: dict[str, str]) -> dict[str, str]:
+    return {
+        "BackgroundPath": _clean(values.get("BackgroundPath", "")),
+        "BackgroundMimeType": _clean(values.get("BackgroundMimeType", "")),
+        "UpdatedAt": _clean(values.get("UpdatedAt", datetime.utcnow().isoformat())),
+    }
