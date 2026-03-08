@@ -17,8 +17,8 @@
 
   <section class="panel">
     <div class="panel-head">
-      <h2>Taak bewerken</h2>
-      <a href="{{ url_for('tasks', plant=task.Plant, month=task.Maand) }}">Terug naar takenlijst</a>
+      <h2>Taak aanpassen</h2>
+      <a href="{{ url_for('tasks', plant=task.Plant, month=task.Maand) }}">Terug naar overzicht</a>
     </div>
     <form method="post" class="editor-grid">
       <input name="ID" value="{{ task.ID }}" readonly>
@@ -45,11 +45,11 @@
           <option value="{{ status }}" {% if task.Status == status %}selected{% endif %}>{{ status }}</option>
         {% endfor %}
       </select>
-      <input name="Duur" list="duration-options" value="{{ task.Duur }}">
-      <input name="DashboardVolgorde" type="number" min="1" value="{{ task.DashboardVolgorde }}">
+      <input name="Duur" list="duration-options" value="{{ task.Duur }}" placeholder="Hoe lang duurt dit ongeveer?">
+      <input name="DashboardVolgorde" type="number" min="1" value="{{ task.DashboardVolgorde }}" placeholder="Volgorde op dashboard">
       <textarea name="Actie" required>{{ task.Actie }}</textarea>
       <textarea name="Opmerking">{{ task.Opmerking }}</textarea>
-      <button type="submit">Taak opslaan</button>
+      <button type="submit">Bewaar wijzigingen</button>
     </form>
     <datalist id="plant-options">
       {% for plant in plants %}

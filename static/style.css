@@ -117,6 +117,11 @@ h2 {
   box-shadow: var(--shadow);
 }
 
+.panel-danger {
+  border-color: rgba(164, 72, 72, 0.2);
+  background: rgba(255, 244, 241, 0.88);
+}
+
 .hero,
 .section-heading {
   display: flex;
@@ -216,12 +221,32 @@ button {
   cursor: pointer;
 }
 
+.button-danger {
+  background: linear-gradient(135deg, #9a3f3f, #c45c49);
+}
+
+.button-link.subtle {
+  color: var(--muted);
+}
+
 .stat-grid,
 .dashboard-grid,
 .card-grid,
 .planner-grid {
   display: grid;
   gap: 18px;
+}
+
+.danger-copy {
+  max-width: 60ch;
+  margin-bottom: 16px;
+  color: #7b4a46;
+}
+
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
 }
 
 .stat-grid {

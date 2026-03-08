@@ -4,8 +4,8 @@
   <section class="hero">
     <div>
       <p class="eyebrow">Seizoensoverzicht</p>
-      <h1>Een rustige plek voor alle tuinklussen.</h1>
-      <p class="lede">De app leest de bestaande tuinplanning in, bewaart alles in Firestore en helpt nu ook met fotogestuurde taakvoorstellen per plant.</p>
+      <h1>Alles voor de tuin, overzichtelijk op een plek.</h1>
+      <p class="lede">Bekijk wat er deze maand speelt, voeg slim nieuwe taken toe en houd per plant makkelijk overzicht.</p>
     </div>
     <form method="get" class="month-picker">
       <label for="month">Gekozen maand</label>
@@ -21,11 +21,11 @@
     <div class="panel-head">
       <div>
         <p class="eyebrow">Slimme invoer</p>
-        <h2>Typ een plant of laat de foto eerst helpen met herkenning</h2>
+        <h2>Upload een foto en krijg hulp bij plantzorg</h2>
       </div>
     </div>
     <form method="post" action="{{ url_for('propose_tasks') }}" enctype="multipart/form-data" class="editor-grid">
-      <input name="plant_name" list="plant-options" placeholder="Typ plantnaam of laat leeg voor fotoherkenning" value="{{ proposal_result.manual_plant if proposal_result else '' }}">
+      <input name="plant_name" list="plant-options" placeholder="Typ alvast de plantnaam, of laat dit leeg" value="{{ proposal_result.manual_plant if proposal_result else '' }}">
       <input type="file" name="plant_photo" accept="image/*" required>
       <button type="submit">Analyseer foto</button>
     </form>
@@ -34,7 +34,7 @@
         <option value="{{ plant }}"></option>
       {% endfor %}
     </datalist>
-    <p class="task-note">Optie 1: typ zelf de plant. Optie 2: laat het veld leeg en gebruik de foto voor herkenning. Daarna kies je welke taken en tips je wilt overnemen.</p>
+    <p class="task-note">Je kunt zelf de plant invullen of de foto laten helpen met herkennen. Daarna kies je rustig welke zorgtaken je wilt bewaren.</p>
   </section>
 
   {% if proposal_result %}
@@ -42,18 +42,18 @@
       <div class="panel-head">
         <div>
           <p class="eyebrow">Gemini voorstel</p>
-          <h2>Analyse voor {{ proposal_result.plant_name }}</h2>
+          <h2>Zorgadvies voor {{ proposal_result.plant_name }}</h2>
         </div>
       </div>
       <div class="analysis-summary">
         <div class="chip-cloud">
-          <span class="chip">Gekozen plant <strong>{{ proposal_result.plant_name }}</strong></span>
+          <span class="chip">Herkende plant <strong>{{ proposal_result.plant_name }}</strong></span>
           {% if proposal_result.identification_confidence != "" %}
-            <span class="chip">Confidence <strong>{{ proposal_result.identification_confidence }}</strong></span>
+            <span class="chip">Zekerheid <strong>{{ proposal_result.identification_confidence }}</strong></span>
           {% endif %}
         </div>
         {% if proposal_result.plant_options %}
-          <p class="task-note">Mogelijke plantopties: {{ proposal_result.plant_options|unique|join(', ') }}</p>
+          <p class="task-note">Mogelijke opties: {{ proposal_result.plant_options|unique|join(', ') }}</p>
         {% endif %}
         {% if proposal_result.identification_reason %}
           <p class="task-note">{{ proposal_result.identification_reason }}</p>
@@ -62,9 +62,9 @@
       {% if proposal_result.summary %}
         <p class="lede compact-lede">{{ proposal_result.summary }}</p>
       {% endif %}
-      {% if proposal_result.direct_tips %}
+      {% if proposal_result.year_round_maintenance %}
         <div class="tips-list">
-          {% for tip in proposal_result.direct_tips %}
+          {% for tip in proposal_result.year_round_maintenance %}
             <div class="tip-card">{{ tip }}</div>
           {% endfor %}
         </div>
@@ -72,21 +72,21 @@
       <form method="post" action="{{ url_for('accept_proposals') }}">
         <input type="hidden" name="proposal-count" value="{{ proposal_result.tasks|length }}">
         <div class="proposal-plant-picker">
-          <label for="selected_plant_name">Welke plant wil je voor deze taken gebruiken?</label>
+          <label for="selected_plant_name">Bij welke plant wil je deze taken opslaan?</label>
           <select id="selected_plant_name" name="selected_plant_name">
             {% for plant in proposal_result.all_plant_options %}
               <option value="{{ plant }}" {% if proposal_result.plant_name == plant %}selected{% endif %}>{{ plant }}</option>
             {% endfor %}
             <option value="__custom__">Andere plant...</option>
           </select>
-          <input id="custom_plant_name" name="custom_plant_name" list="plant-options" placeholder="Typ een andere plantnaam" {% if proposal_result.plant_name not in proposal_result.all_plant_options %}value="{{ proposal_result.plant_name }}"{% endif %}>
+          <input id="custom_plant_name" name="custom_plant_name" list="plant-options" placeholder="Typ hier een andere plantnaam" {% if proposal_result.plant_name not in proposal_result.all_plant_options %}value="{{ proposal_result.plant_name }}"{% endif %}>
         </div>
         <div class="proposal-stack">
           {% for proposal in proposal_result.tasks %}
             <article class="proposal-card">
               <label class="proposal-toggle">
                 <input type="checkbox" name="proposal-{{ loop.index0 }}-selected" value="1" checked>
-                <span>Toevoegen aan planning</span>
+                <span>Bewaar deze taak</span>
               </label>
               <div class="proposal-grid">
                 <input type="hidden" name="proposal-{{ loop.index0 }}-Plant" value="{{ proposal.Plant }}">
@@ -111,7 +111,7 @@
                 <textarea name="proposal-{{ loop.index0 }}-Opmerking">{{ proposal.Opmerking }}</textarea>
               </div>
               <div class="proposal-meta">
-                <span class="chip">Confidence <strong>{{ proposal.Confidence }}</strong></span>
+                <span class="chip">Zekerheid <strong>{{ proposal.Confidence }}</strong></span>
                 <span class="chip">{{ proposal.Reason }}</span>
               </div>
             </article>
@@ -122,7 +122,7 @@
             <option value="{{ duration }}"></option>
           {% endfor %}
         </datalist>
-        <button type="submit">Geselecteerde taken opslaan</button>
+        <button type="submit">Bewaar gekozen taken</button>
       </form>
     </section>
   {% endif %}
@@ -166,8 +166,8 @@
   <section class="dashboard-grid">
     <article class="panel">
       <div class="panel-head">
-        <h2>Taken in {{ selected_month }}</h2>
-        <a href="{{ url_for('tasks', month=selected_month) }}">Volledige lijst</a>
+        <h2>Wat er speelt in {{ selected_month }}</h2>
+        <a href="{{ url_for('tasks', month=selected_month) }}">Bekijk alles</a>
       </div>
       <div class="task-list">
         {% for task in tasks %}
@@ -186,15 +186,15 @@
             {% endif %}
           </div>
         {% else %}
-          <p class="empty-state">Geen taken gevonden voor deze maand.</p>
+          <p class="empty-state">Voor deze maand staan er nog geen taken gepland.</p>
         {% endfor %}
       </div>
     </article>
 
     <article class="panel">
       <div class="panel-head">
-        <h2>Werkdruk per plant</h2>
-        <a href="{{ url_for('plants') }}">Plantregister</a>
+        <h2>Overzicht per plant</h2>
+        <a href="{{ url_for('plants') }}">Alle planten</a>
       </div>
       <div class="workload-list">
         {% for item in workload %}
@@ -205,7 +205,7 @@
             <span>{{ item.high }} hoog</span>
           </a>
         {% else %}
-          <p class="empty-state">Nog geen plantbelasting beschikbaar.</p>
+          <p class="empty-state">Nog geen plantoverzicht beschikbaar.</p>
         {% endfor %}
       </div>
     </article>
@@ -214,7 +214,7 @@
   <section class="dashboard-grid secondary">
     <article class="panel">
       <div class="panel-head">
-        <h2>Categorieverdeling</h2>
+        <h2>Verdeling van de taken</h2>
       </div>
       <div class="chip-cloud">
         {% if month_summary %}
@@ -227,7 +227,7 @@
 
     <article class="panel">
       <div class="panel-head">
-        <h2>Eerstvolgende open taken</h2>
+        <h2>Wat komt hierna</h2>
       </div>
       <div class="mini-list">
         {% for task in next_up %}

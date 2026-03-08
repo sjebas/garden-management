@@ -6,6 +6,7 @@ import json
 import mimetypes
 import os
 from pathlib import Path
+import re
 import secrets
 
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
@@ -163,6 +164,22 @@ def _next_up(tasks: list[dict[str, str]]) -> list[dict[str, str]]:
     )[:8]
 
 
+def _normalize_week(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    match = re.search(r"(\d+)", raw)
+    return match.group(1) if match else raw
+
+
+def _coerce_option(value: object, allowed: list[str], fallback: str = "") -> str:
+    candidate = str(value or "").strip()
+    if candidate in allowed:
+        return candidate
+    lowered = {item.lower(): item for item in allowed}
+    return lowered.get(candidate.lower(), fallback or (allowed[0] if allowed else candidate))
+
+
 def _proposal_form_values(form, index: int) -> dict[str, str]:
     selected_plant = form.get("selected_plant_name", "").strip()
     custom_plant = form.get("custom_plant_name", "").strip()
@@ -170,7 +187,7 @@ def _proposal_form_values(form, index: int) -> dict[str, str]:
     return {
         "Plant": resolved_plant,
         "Maand": form.get(f"proposal-{index}-Maand", "").strip(),
-        "Week": form.get(f"proposal-{index}-Week", "").strip(),
+        "Week": _normalize_week(form.get(f"proposal-{index}-Week", "")),
         "Categorie": form.get(f"proposal-{index}-Categorie", "").strip(),
         "Actie": form.get(f"proposal-{index}-Actie", "").strip(),
         "Prioriteit": form.get(f"proposal-{index}-Prioriteit", "").strip(),
@@ -315,17 +332,23 @@ def create_app() -> Flask:
             proposal_tasks.append(
                 {
                     "Plant": resolved_plant_name,
-                    "Maand": str(item.get("month", "")).strip(),
-                    "Week": str(item.get("week", "")).strip(),
-                    "Categorie": str(item.get("category", "")).strip(),
+                    "Maand": _coerce_option(item.get("month", ""), reference["months"], _current_month_name()),
+                    "Week": _normalize_week(item.get("week", "")),
+                    "Categorie": _coerce_option(item.get("category", ""), reference["categories"], "Onderhoud"),
                     "Actie": str(item.get("action", "")).strip(),
-                    "Prioriteit": str(item.get("priority", "")).strip(),
-                    "Duur": str(item.get("duration", "")).strip(),
+                    "Prioriteit": _coerce_option(item.get("priority", ""), reference["priorities"], "Middel"),
+                    "Duur": _coerce_option(item.get("duration", ""), reference["durations"], "15 min"),
                     "Opmerking": str(item.get("note", "")).strip(),
                     "Confidence": item.get("confidence", ""),
                     "Reason": str(item.get("reason", "")).strip(),
                 }
             )
+
+        year_round_maintenance = [
+            str(item).strip()
+            for item in analysis_result.get("year_round_maintenance", [])
+            if str(item).strip()
+        ]
 
         return render_template(
             "dashboard.html",
@@ -358,11 +381,7 @@ def create_app() -> Flask:
                 ],
                 "identification_confidence": analysis_result.get("identification_confidence", ""),
                 "identification_reason": analysis_result.get("identification_reason", ""),
-                "direct_tips": [
-                    str(item).strip()
-                    for item in analysis_result.get("direct_tips", [])
-                    if str(item).strip()
-                ],
+                "year_round_maintenance": year_round_maintenance,
                 "all_plant_options": sorted(
                     {
                         option
@@ -609,6 +628,20 @@ def create_app() -> Flask:
 
         flash(f"{plant['Plant']} is bijgewerkt.", "success")
         return redirect(url_for("plant_detail", plant_name=plant["Plant"]))
+
+    @app.post("/plant/<path:plant_name>/delete")
+    def delete_plant(plant_name: str):
+        try:
+            plant, removed_tasks = STORE.delete_plant(plant_name)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("plants"))
+
+        message = f"{plant['Plant']} is verwijderd."
+        if removed_tasks:
+            message += f" {removed_tasks} gekoppelde taken zijn ook verwijderd."
+        flash(message, "success")
+        return redirect(url_for("plants"))
 
     @app.route("/task/<task_id>", methods=["GET", "POST"])
     def task_detail(task_id: str):

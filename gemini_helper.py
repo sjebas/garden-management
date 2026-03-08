@@ -15,7 +15,7 @@ ANALYSIS_SCHEMA = {
         "identification_reason": {"type": "string"},
         "plant_options": {"type": "array", "items": {"type": "string"}},
         "summary": {"type": "string"},
-        "direct_tips": {"type": "array", "items": {"type": "string"}},
+        "year_round_maintenance": {"type": "array", "items": {"type": "string"}},
         "tasks": {
             "type": "array",
             "items": {
@@ -51,7 +51,7 @@ ANALYSIS_SCHEMA = {
         "identification_reason",
         "plant_options",
         "summary",
-        "direct_tips",
+        "year_round_maintenance",
         "tasks",
     ],
 }
@@ -104,8 +104,8 @@ Als dat veld leeg is, gebruik de foto om de plant zo goed mogelijk te herkennen.
 
 Jouw taken:
 1. Bepaal welke plant dit waarschijnlijk is.
-2. Geef 2 tot 4 directe onderhoudstips.
-3. Geef 2 tot 6 concrete onderhoudstaken die in een planning kunnen worden opgeslagen.
+2. Geef een compleet jaar-rond onderhoudsoverzicht voor deze plant.
+3. Geef alleen de concrete onderhoudstaken die echt nodig of zinvol zijn op basis van de plant en de huidige foto/toestand.
 
 Regels:
 - Gebruik Nederlands.
@@ -114,10 +114,17 @@ Regels:
 - Gebruik alleen categorieen uit deze lijst: {", ".join(allowed_categories) or "Snoeien, Bemesten, Onderhoud, Beschermen, Controle, Water geven"}.
 - Gebruik alleen prioriteiten uit deze lijst: {", ".join(allowed_priorities)}.
 - Gebruik bij voorkeur een duur uit deze lijst: {", ".join(allowed_durations) or "5 min, 10 min, 15 min, 30 min, 1 uur"}.
+- "week" moet alleen een getal zijn zoals 1, 2, 3 of 4. Schrijf nooit "Week 1".
 - "plant_options" moet 1 tot 5 mogelijke plantnamen bevatten.
 - Gebruik waar mogelijk plantnamen uit deze bestaande plantenlijst: {", ".join(known_plants[:120])}.
 - "identified_plant" moet de beste keuze zijn uit "plant_options".
 - Gebruik de huidige maand "{current_month}" tenzij een andere maand duidelijk logischer is.
+- "year_round_maintenance" moet vollediger zijn dan de takenlijst en belangrijke terugkerende aandachtspunten benoemen voor het hele jaar.
+- Noem in "year_round_maintenance" expliciet seizoensgebonden zorg zoals snoeien, water geven, bemesten, standplaats, winterbescherming, ziekten/plagen en bijzonderheden voor deze plant als die relevant zijn.
+- Zorg dat geen belangrijke onderhoudspunten ontbreken als ze normaal gezien essentieel zijn voor deze plant.
+- Het aantal items in "tasks" is variabel: geef weinig taken als weinig nodig is en meer taken als de plant daar echt om vraagt.
+- Voeg geen opvultaak toe alleen om een minimum aantal te halen.
+- De concrete "tasks" moeten passen bij de huidige foto, huidige situatie en de onderhoudsbehoefte van juist deze plant; de jaar-rond tips mogen breder zijn.
 - Geef alleen JSON terug volgens het schema.
 
 Plantprofiel van eventueel gekozen plant:

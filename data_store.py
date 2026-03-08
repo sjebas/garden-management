@@ -106,6 +106,10 @@ class BaseStore(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def delete_plant(self, name: str) -> tuple[dict[str, str], int]:
+        raise NotImplementedError
+
+    @abstractmethod
     def ensure_plant(self, name: str) -> dict[str, str]:
         raise NotImplementedError
 
@@ -187,6 +191,18 @@ class FileStore(BaseStore):
                 task["Plant"] = plant["Plant"]
         self._write(payload)
         return plant
+
+    def delete_plant(self, name: str) -> tuple[dict[str, str], int]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+
+        remaining_plants = [item for item in payload["plants"] if item["id"] != plant["id"]]
+        removed_tasks = [task for task in payload["tasks"] if task["PlantId"] == plant["id"]]
+        remaining_tasks = [task for task in payload["tasks"] if task["PlantId"] != plant["id"]]
+        self._write({"plants": remaining_plants, "tasks": remaining_tasks})
+        return plant, len(removed_tasks)
 
     def ensure_plant(self, name: str) -> dict[str, str]:
         plant = self.get_plant_by_name(name)
@@ -300,6 +316,20 @@ class FirestoreStore(BaseStore):
             batch.set(doc.reference, task)
         batch.commit()
         return updated
+
+    def delete_plant(self, name: str) -> tuple[dict[str, str], int]:
+        plant = self.get_plant_by_name(name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+
+        batch = self.client.batch()
+        removed_tasks = 0
+        batch.delete(self.plants_collection.document(plant["id"]))
+        for doc in self.tasks_collection.where("PlantId", "==", plant["id"]).stream():
+            batch.delete(doc.reference)
+            removed_tasks += 1
+        batch.commit()
+        return plant, removed_tasks
 
     def ensure_plant(self, name: str) -> dict[str, str]:
         plant = self.get_plant_by_name(name)
