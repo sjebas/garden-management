@@ -9,7 +9,7 @@ substitutions:
   _FIRESTORE_COLLECTION_PREFIX: garden
   _RUNTIME_SERVICE_ACCOUNT: garden-flow-runner@garden-management-489611.iam.gserviceaccount.com
   _GEMINI_SECRET_NAME: gemini-api-key
-  _GARDEN_MAP_BUCKET: ""
+  _GARDEN_MAP_BUCKET: "garden-management-489611-map"
   _MAX_INSTANCES: "4"
   _MIN_INSTANCES: "0"
 
