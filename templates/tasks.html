@@ -9,54 +9,6 @@
     <a class="button-link" href="#new-task">Taak toevoegen</a>
   </section>
 
-  <section class="panel" id="new-task">
-    <div class="panel-head">
-      <h2>Nieuwe taak bewaren</h2>
-    </div>
-    <form method="post" action="{{ url_for('create_task') }}" class="editor-grid">
-      <input name="Plant" list="plant-options" placeholder="Voor welke plant?" value="{{ new_task.Plant }}" required>
-      <select name="Maand" required>
-        <option value="">Kies maand</option>
-        {% for month in months %}
-          <option value="{{ month }}" {% if new_task.Maand == month %}selected{% endif %}>{{ month }}</option>
-        {% endfor %}
-      </select>
-      <input name="Week" type="number" min="1" max="5" placeholder="Weeknummer" value="{{ new_task.Week }}">
-      <select name="Categorie">
-        <option value="">Kies categorie</option>
-        {% for category in categories %}
-          <option value="{{ category }}">{{ category }}</option>
-        {% endfor %}
-      </select>
-      <select name="Prioriteit">
-        <option value="">Kies prioriteit</option>
-        {% for priority in priorities %}
-          <option value="{{ priority }}" {% if new_task.Prioriteit == priority %}selected{% endif %}>{{ priority }}</option>
-        {% endfor %}
-      </select>
-      <select name="Status">
-        {% for status in statuses %}
-          <option value="{{ status }}" {% if new_task.Status == status %}selected{% endif %}>{{ status }}</option>
-        {% endfor %}
-      </select>
-      <input name="Duur" list="duration-options" placeholder="Hoe lang duurt dit ongeveer?" value="{{ new_task.Duur }}">
-      <input name="DashboardVolgorde" type="number" min="1" placeholder="Volgorde op dashboard">
-      <textarea name="Actie" placeholder="Wat moet er gebeuren?" required>{{ new_task.Actie }}</textarea>
-      <textarea name="Opmerking" placeholder="Extra notitie">{{ new_task.Opmerking }}</textarea>
-      <button type="submit">Bewaar taak</button>
-    </form>
-    <datalist id="plant-options">
-      {% for plant in plants %}
-        <option value="{{ plant }}"></option>
-      {% endfor %}
-    </datalist>
-    <datalist id="duration-options">
-      {% for duration in durations %}
-        <option value="{{ duration }}"></option>
-      {% endfor %}
-    </datalist>
-  </section>
-
   <form method="get" class="filters">
     <input type="search" name="q" placeholder="Zoek op plant, taak of notitie" value="{{ filters.q }}">
     <select name="month">
@@ -83,6 +35,10 @@
         <option value="{{ plant }}" {% if filters.plant == plant %}selected{% endif %}>{{ plant }}</option>
       {% endfor %}
     </select>
+    <label class="toggle-field">
+      <input type="checkbox" name="show_done" value="1" {% if filters.show_done %}checked{% endif %}>
+      <span>Toon afgeronde taken</span>
+    </label>
     <button type="submit">Toon resultaat</button>
   </form>
 
@@ -138,5 +94,53 @@
         </tbody>
       </table>
     </div>
+  </section>
+
+  <section class="panel" id="new-task">
+    <div class="panel-head">
+      <h2>Nieuwe taak bewaren</h2>
+    </div>
+    <form method="post" action="{{ url_for('create_task') }}" class="editor-grid">
+      <input name="Plant" list="plant-options" placeholder="Voor welke plant?" value="{{ new_task.Plant }}" required>
+      <select name="Maand" required>
+        <option value="">Kies maand</option>
+        {% for month in months %}
+          <option value="{{ month }}" {% if new_task.Maand == month %}selected{% endif %}>{{ month }}</option>
+        {% endfor %}
+      </select>
+      <input name="Week" type="number" min="1" max="5" placeholder="Weeknummer" value="{{ new_task.Week }}">
+      <select name="Categorie">
+        <option value="">Kies categorie</option>
+        {% for category in categories %}
+          <option value="{{ category }}">{{ category }}</option>
+        {% endfor %}
+      </select>
+      <select name="Prioriteit">
+        <option value="">Kies prioriteit</option>
+        {% for priority in priorities %}
+          <option value="{{ priority }}" {% if new_task.Prioriteit == priority %}selected{% endif %}>{{ priority }}</option>
+        {% endfor %}
+      </select>
+      <select name="Status">
+        {% for status in statuses %}
+          <option value="{{ status }}" {% if new_task.Status == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+      <input name="Duur" list="duration-options" placeholder="Hoe lang duurt dit ongeveer?" value="{{ new_task.Duur }}">
+      <input name="DashboardVolgorde" type="number" min="1" placeholder="Volgorde op dashboard">
+      <textarea name="Actie" placeholder="Wat moet er gebeuren?" required>{{ new_task.Actie }}</textarea>
+      <textarea name="Opmerking" placeholder="Extra notitie">{{ new_task.Opmerking }}</textarea>
+      <button type="submit">Bewaar taak</button>
+    </form>
+    <datalist id="plant-options">
+      {% for plant in plants %}
+        <option value="{{ plant }}"></option>
+      {% endfor %}
+    </datalist>
+    <datalist id="duration-options">
+      {% for duration in durations %}
+        <option value="{{ duration }}"></option>
+      {% endfor %}
+    </datalist>
   </section>
 {% endblock %}

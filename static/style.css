@@ -353,6 +353,13 @@ button {
   margin-bottom: 16px;
 }
 
+.panel-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .task-list,
 .mini-list,
 .workload-list,
@@ -409,6 +416,12 @@ button {
   gap: 10px;
 }
 
+.task-item.status-gereed,
+tr.status-gereed,
+.mini-item.status-gereed {
+  opacity: 0.62;
+}
+
 .task-title {
   margin-bottom: 4px;
   font-weight: 700;
@@ -424,6 +437,27 @@ button {
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.toggle-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--text);
+}
+
+.toggle-field input {
+  appearance: auto;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+  border: 0;
+  background: transparent;
 }
 
 .task-actions form,
@@ -899,6 +933,11 @@ td {
     align-items: stretch;
   }
 
+  .panel-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .panel-head a,
   .button-link,
   button {
@@ -907,6 +946,11 @@ td {
 
   .filter-actions {
     flex-direction: column;
+  }
+
+  .toggle-field {
+    width: 100%;
+    justify-content: flex-start;
   }
 
   select,

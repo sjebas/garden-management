@@ -193,6 +193,16 @@ def _next_up(tasks: list[dict[str, str]]) -> list[dict[str, str]]:
     )[:8]
 
 
+def _task_display_sort_key(task: dict[str, str]) -> tuple[int, int, int, int, str]:
+    return (
+        1 if task.get("Status") == "Gereed" else 0,
+        MONTH_INDEX.get(task.get("Maand", ""), 99),
+        PRIORITY_ORDER.get(task.get("Prioriteit", ""), 99),
+        int(task["Week"]) if str(task.get("Week", "")).isdigit() else 99,
+        task.get("Plant", ""),
+    )
+
+
 def _normalize_week(value: object) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -250,16 +260,13 @@ def create_app() -> Flask:
         selected_week = request.args.get("week") or _current_week_of_month()
         if selected_week not in {"1", "2", "3", "4", "5"}:
             selected_week = _current_week_of_month()
+        show_done = request.args.get("show_done", "").strip() == "1"
 
         week_tasks = [task for task in tasks if task["Maand"] == selected_month and str(task["Week"]) == selected_week]
+        visible_week_tasks = week_tasks if show_done else [task for task in week_tasks if task["Status"] != "Gereed"]
         week_tasks = sorted(
-            week_tasks,
-            key=lambda task: (
-                PRIORITY_ORDER.get(task["Prioriteit"], 99),
-                STATUS_ORDER.get(task["Status"], 99),
-                int(task["Week"]) if str(task["Week"]).isdigit() else 99,
-                task["Plant"],
-            ),
+            visible_week_tasks,
+            key=_task_display_sort_key,
         )
         open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
         week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
@@ -285,6 +292,7 @@ def create_app() -> Flask:
             page_title="Dashboard",
             selected_month=selected_month,
             selected_week=selected_week,
+            show_done=show_done,
             months=MONTHS,
             weeks=["1", "2", "3", "4", "5"],
             tasks=week_tasks,
@@ -294,8 +302,6 @@ def create_app() -> Flask:
             month_summary=month_summary,
             next_up=_next_up(tasks),
             total_plants=len(plants),
-            plants_for_upload=[plant["Plant"] for plant in plants],
-            proposal_result=None,
         )
 
     @app.post("/assistant/propose")
@@ -304,20 +310,24 @@ def create_app() -> Flask:
         reference = _load_reference_data()
         plant_name = request.form.get("plant_name", "").strip()
         image = request.files.get("plant_photo")
+        has_image = bool(image is not None and image.filename)
+        image_bytes = None
+        mime_type = None
 
-        if image is None or not image.filename:
-            flash("Upload eerst een foto van de plant.", "error")
-            return redirect(url_for("dashboard"))
+        if not plant_name and not has_image:
+            flash("Vul een plantnaam in of upload een foto.", "error")
+            return redirect(url_for("plants"))
 
-        mime_type = image.mimetype or mimetypes.guess_type(image.filename)[0] or ""
-        if not mime_type.startswith("image/"):
-            flash("Alleen afbeeldingsbestanden zijn toegestaan.", "error")
-            return redirect(url_for("dashboard"))
+        if has_image:
+            mime_type = image.mimetype or mimetypes.guess_type(image.filename)[0] or ""
+            if not mime_type.startswith("image/"):
+                flash("Alleen afbeeldingsbestanden zijn toegestaan.", "error")
+                return redirect(url_for("plants"))
 
-        image_bytes = image.read()
-        if not image_bytes:
-            flash("De geuploade foto is leeg.", "error")
-            return redirect(url_for("dashboard"))
+            image_bytes = image.read()
+            if not image_bytes:
+                flash("De geuploade foto is leeg.", "error")
+                return redirect(url_for("plants"))
 
         all_tasks = STORE.list_tasks()
         plant_profile = next((plant for plant in plants if plant["Plant"] == plant_name), None)
@@ -339,7 +349,7 @@ def create_app() -> Flask:
             )
         except Exception as exc:
             flash(f"Kon geen voorstellen genereren: {exc}", "error")
-            return redirect(url_for("dashboard"))
+            return redirect(url_for("plants"))
 
         selected_month = request.args.get("month") or _current_month_name()
         if selected_month not in MONTHS:
@@ -402,29 +412,23 @@ def create_app() -> Flask:
         open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
         week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
 
+        plant_items = _plants_with_stats()
         return render_template(
-            "dashboard.html",
-            page_title="Dashboard",
-            selected_month=selected_month,
-            selected_week=selected_week,
-            months=MONTHS,
-            weeks=["1", "2", "3", "4", "5"],
-            tasks=sorted(
-                week_tasks,
-                key=lambda task: (
-                    PRIORITY_ORDER.get(task["Prioriteit"], 99),
-                    STATUS_ORDER.get(task["Status"], 99),
-                    int(task["Week"]) if str(task["Week"]).isdigit() else 99,
-                    task["Plant"],
-                ),
-            ),
-            open_week_tasks=len(open_week_tasks),
-            week_time_budget=_format_minutes(week_minutes),
-            workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
-            month_summary=month_summary,
-            next_up=_next_up(all_tasks),
-            total_plants=len(plants),
-            plants_for_upload=[plant["Plant"] for plant in plants],
+            "plants.html",
+            page_title="Planten",
+            plants=sorted(plant_items, key=lambda plant: (-int(plant["OpenTaken"]), str(plant["Plant"]))),
+            types=reference["plant_types"],
+            hardiness_options=reference["hardiness_options"],
+            filters={"q": "", "type": "", "winterhard": ""},
+            new_plant={
+                "Plant": "",
+                "Type": "",
+                "Snoeigroep": "",
+                "Standplaats": "",
+                "Winterhard": "",
+                "Notitie": "",
+            },
+            plants_for_upload=[plant["Plant"] for plant in plant_items],
             proposal_result={
                 "summary": analysis_result.get("summary", ""),
                 "tasks": proposal_tasks,
@@ -472,7 +476,7 @@ def create_app() -> Flask:
             flash(f"{created} voorgestelde taken toegevoegd aan de database.", "success")
         else:
             flash("Geen taken toegevoegd. Selecteer minstens een geldig voorstel.", "error")
-        return redirect(url_for("tasks"))
+        return redirect(url_for("plants"))
 
     @app.route("/tasks")
     def tasks():
@@ -484,6 +488,7 @@ def create_app() -> Flask:
         selected_priority = request.args.get("priority", "").strip()
         selected_plant = request.args.get("plant", "").strip()
         text_query = request.args.get("q", "").strip().lower()
+        show_done = request.args.get("show_done", "").strip() == "1"
 
         if selected_month:
             items = [task for task in items if task["Maand"] == selected_month]
@@ -501,17 +506,10 @@ def create_app() -> Flask:
                     [task["ID"], task["Plant"], task["Categorie"], task["Actie"], task["Opmerking"]]
                 ).lower()
             ]
+        if not show_done:
+            items = [task for task in items if task["Status"] != "Gereed"]
 
-        items = sorted(
-            items,
-            key=lambda task: (
-                MONTH_INDEX.get(task["Maand"], 99),
-                PRIORITY_ORDER.get(task["Prioriteit"], 99),
-                STATUS_ORDER.get(task["Status"], 99),
-                int(task["Week"]) if str(task["Week"]).isdigit() else 99,
-                task["Plant"],
-            ),
-        )
+        items = sorted(items, key=_task_display_sort_key)
 
         return render_template(
             "tasks.html",
@@ -529,6 +527,7 @@ def create_app() -> Flask:
                 "priority": selected_priority,
                 "plant": selected_plant,
                 "q": request.args.get("q", "").strip(),
+                "show_done": show_done,
             },
             new_task={
                 "Plant": selected_plant,
@@ -598,13 +597,6 @@ def create_app() -> Flask:
             types=reference["plant_types"],
             hardiness_options=reference["hardiness_options"],
             filters={"q": request.args.get("q", "").strip(), "type": selected_type, "winterhard": selected_hardiness},
-        )
-
-    @app.get("/plants/new")
-    def new_plant():
-        return render_template(
-            "new_plant.html",
-            page_title="Plant toevoegen",
             new_plant={
                 "Plant": "",
                 "Type": "",
@@ -613,6 +605,9 @@ def create_app() -> Flask:
                 "Winterhard": "",
                 "Notitie": "",
             },
+            plants_for_upload=[plant["Plant"] for plant in items],
+            proposal_result=None,
+            proposal_reference=reference,
         )
 
     @app.post("/plants/create")
@@ -658,14 +653,7 @@ def create_app() -> Flask:
             abort(404)
 
         tasks = [task for task in STORE.list_tasks() if task["PlantId"] == plant["id"]]
-        tasks = sorted(
-            tasks,
-            key=lambda task: (
-                MONTH_INDEX.get(task["Maand"], 99),
-                int(task["Week"]) if str(task["Week"]).isdigit() else 99,
-                PRIORITY_ORDER.get(task["Prioriteit"], 99),
-            ),
-        )
+        tasks = sorted(tasks, key=_task_display_sort_key)
         heatmap = next(item for item in _yearly_heatmap([plant], tasks) if item["plant"] == plant["Plant"])
 
         return render_template(

@@ -67,8 +67,8 @@ def gemini_client() -> genai.Client:
 def analyze_plant_image(
     *,
     selected_plant_name: str,
-    image_bytes: bytes,
-    mime_type: str,
+    image_bytes: bytes | None,
+    mime_type: str | None,
     current_month: str,
     plant_profile: dict[str, object] | None,
     existing_tasks: list[dict[str, str]],
@@ -79,7 +79,7 @@ def analyze_plant_image(
     allowed_durations: list[str],
 ) -> dict[str, object]:
     client = gemini_client()
-    image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+    has_image = bool(image_bytes and mime_type)
 
     plant_context = selected_plant_name or "Niet vooraf gekozen"
     plant_lines = []
@@ -101,6 +101,7 @@ Je helpt in een Nederlandse tuinbeheer-app voor particulieren.
 
 De gebruiker heeft mogelijk al een plant gekozen: "{plant_context}".
 Als dat veld leeg is, gebruik de foto om de plant zo goed mogelijk te herkennen.
+Als er geen foto is, gebruik dan de gekozen plantnaam en eventuele profielinformatie als hoofdbron.
 
 Jouw taken:
 1. Bepaal welke plant dit waarschijnlijk is.
@@ -119,6 +120,7 @@ Regels:
 - "plant_options" moet 1 tot 5 mogelijke plantnamen bevatten.
 - Gebruik waar mogelijk plantnamen uit deze bestaande plantenlijst: {", ".join(known_plants[:120])}.
 - "identified_plant" moet de beste keuze zijn uit "plant_options".
+- Als een plantnaam al door de gebruiker is ingevuld en er geen foto is, neem die plantnaam normaal gesproken over als "identified_plant", tenzij de profielinformatie daar duidelijk niet bij past.
 - "summary" moet maximaal 2 of 3 korte zinnen zijn.
 - "year_round_maintenance" moet uit 3 tot 6 korte bullets bestaan, geen lange alinea's, en alleen de belangrijkste aandachtspunten noemen.
 - Noem in "year_round_maintenance" expliciet seizoensgebonden zorg zoals snoeien, water geven, bemesten, standplaats, winterbescherming, ziekten/plagen en bijzonderheden voor deze plant als die relevant zijn.
@@ -128,7 +130,8 @@ Regels:
 - Voeg geen opvultaak toe alleen om een aantal te halen.
 - Iedere taak moet concreet, uitvoerbaar en los opslaanbaar zijn.
 - Vermijd dubbele taken die hetzelfde moment en dezelfde handeling beschrijven.
-- Gebruik de huidige foto en de huidige situatie als extra context, maar laat belangrijke onderhoudsmomenten later in het jaar niet weg.
+- Gebruik de huidige foto en de huidige situatie als extra context als er een foto is, maar laat belangrijke onderhoudsmomenten later in het jaar niet weg.
+- Als er geen foto is, zeg dan niets over zichtbare kenmerken of huidige beeldwaarnemingen.
 - Geef alleen JSON terug volgens het schema.
 
 Plantprofiel van eventueel gekozen plant:
@@ -138,9 +141,13 @@ Bestaande voorbeeldtaken:
 {chr(10).join(examples) if examples else "- Nog geen bestaande taken voor deze plant"}
 """.strip()
 
+    contents: list[object] = [prompt]
+    if has_image:
+        contents.append(types.Part.from_bytes(data=image_bytes, mime_type=mime_type))
+
     response = client.models.generate_content(
         model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
-        contents=[prompt, image_part],
+        contents=contents,
         config={
             "response_mime_type": "application/json",
             "response_schema": ANALYSIS_SCHEMA,

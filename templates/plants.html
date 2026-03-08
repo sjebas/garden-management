@@ -7,7 +7,7 @@
       <h1>Alles wat je over je planten wilt terugvinden.</h1>
       <p class="lede compact-lede">Zoek snel een plant, bekijk de belangrijkste info en open direct de detailpagina.</p>
     </div>
-    <a class="button-link" href="{{ url_for('new_plant') }}">Plant toevoegen</a>
+    <a class="button-link" href="#new-plant">Plant toevoegen</a>
   </section>
 
   <section class="panel filter-panel">
@@ -40,6 +40,174 @@
       </div>
     </form>
   </section>
+
+  <section class="panel upload-panel">
+    <div class="panel-head">
+      <div>
+        <p class="eyebrow">Slimme invoer</p>
+        <h2>Typ een plantnaam of upload een foto</h2>
+      </div>
+    </div>
+    <form method="post" action="{{ url_for('propose_tasks') }}" enctype="multipart/form-data" class="editor-grid">
+      <input name="plant_name" list="plant-options" placeholder="Typ de plantnaam als je die al weet" value="{{ proposal_result.manual_plant if proposal_result else '' }}">
+      <input type="file" name="plant_photo" accept="image/*">
+      <button type="submit">Analyseer foto</button>
+    </form>
+    <datalist id="plant-options">
+      {% for plant in plants_for_upload %}
+        <option value="{{ plant }}"></option>
+      {% endfor %}
+    </datalist>
+    <p class="task-note">Je kunt alleen een naam invullen, alleen een foto uploaden, of allebei gebruiken. Daarna kies je rustig welke zorgtaken je wilt bewaren.</p>
+  </section>
+
+  {% if proposal_result %}
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">Gemini voorstel</p>
+          <h2>Jaarplan voor {{ proposal_result.plant_name }}</h2>
+        </div>
+      </div>
+      <div class="analysis-summary">
+        <div class="chip-cloud">
+          <span class="chip">Herkende plant <strong>{{ proposal_result.plant_name }}</strong></span>
+          {% if proposal_result.identification_confidence != "" %}
+            <span class="chip">Zekerheid <strong>{{ proposal_result.identification_confidence }}</strong></span>
+          {% endif %}
+        </div>
+        {% if proposal_result.plant_options %}
+          <p class="task-note">Mogelijke opties: {{ proposal_result.plant_options|unique|join(', ') }}</p>
+        {% endif %}
+        {% if proposal_result.identification_reason %}
+          <p class="task-note">{{ proposal_result.identification_reason }}</p>
+        {% endif %}
+      </div>
+      {% if proposal_result.summary %}
+        <p class="lede compact-lede">{{ proposal_result.summary }}</p>
+      {% endif %}
+      {% if proposal_result.year_round_maintenance %}
+        <div class="panel-head compact-head">
+          <h2>Korte onderhoudslijn</h2>
+        </div>
+        <div class="tips-list">
+          {% for tip in proposal_result.year_round_maintenance %}
+            <div class="tip-card">{{ tip }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('accept_proposals') }}">
+        <input type="hidden" name="proposal-count" value="{{ proposal_result.tasks|length }}">
+        <div class="proposal-plant-picker">
+          <label for="selected_plant_name">Bij welke plant wil je deze taken opslaan?</label>
+          <select id="selected_plant_name" name="selected_plant_name">
+            {% for plant in proposal_result.all_plant_options %}
+              <option value="{{ plant }}" {% if proposal_result.plant_name == plant %}selected{% endif %}>{{ plant }}</option>
+            {% endfor %}
+            <option value="__custom__">Andere plant...</option>
+          </select>
+          <input id="custom_plant_name" name="custom_plant_name" list="plant-options" placeholder="Typ hier een andere plantnaam" {% if proposal_result.plant_name not in proposal_result.all_plant_options %}value="{{ proposal_result.plant_name }}"{% endif %}>
+        </div>
+        <div class="panel-head compact-head">
+          <h2>Voorgestelde taken voor het hele jaar</h2>
+          <span>{{ proposal_result.tasks|length }} taken</span>
+        </div>
+        <div class="proposal-toolbar">
+          <p class="task-note">Alleen de aangevinkte taken worden opgeslagen.</p>
+          <div class="proposal-toolbar-actions">
+            <button type="button" class="button-secondary compact-button" data-proposal-toggle="all">Alles aanvinken</button>
+            <button type="button" class="button-secondary compact-button" data-proposal-toggle="none">Alles uitzetten</button>
+          </div>
+        </div>
+        <div class="proposal-stack">
+          {% for proposal in proposal_result.tasks %}
+            <article class="proposal-card">
+              <label class="proposal-toggle">
+                <input type="checkbox" name="proposal-{{ loop.index0 }}-selected" value="1" checked>
+                <span>Bewaar deze taak</span>
+              </label>
+              <div class="proposal-grid">
+                <input type="hidden" name="proposal-{{ loop.index0 }}-Plant" value="{{ proposal.Plant }}">
+                <select name="proposal-{{ loop.index0 }}-Maand">
+                  {% for month in proposal_reference.months %}
+                    <option value="{{ month }}" {% if proposal.Maand == month %}selected{% endif %}>{{ month }}</option>
+                  {% endfor %}
+                </select>
+                <input name="proposal-{{ loop.index0 }}-Week" value="{{ proposal.Week }}" placeholder="Week">
+                <select name="proposal-{{ loop.index0 }}-Categorie">
+                  {% for category in proposal_reference.categories %}
+                    <option value="{{ category }}" {% if proposal.Categorie == category %}selected{% endif %}>{{ category }}</option>
+                  {% endfor %}
+                </select>
+                <select name="proposal-{{ loop.index0 }}-Prioriteit">
+                  {% for priority in proposal_reference.priorities %}
+                    <option value="{{ priority }}" {% if proposal.Prioriteit == priority %}selected{% endif %}>{{ priority }}</option>
+                  {% endfor %}
+                </select>
+                <input name="proposal-{{ loop.index0 }}-Duur" value="{{ proposal.Duur }}" list="proposal-duration-options" placeholder="Duur">
+                <textarea name="proposal-{{ loop.index0 }}-Actie" required>{{ proposal.Actie }}</textarea>
+                <textarea name="proposal-{{ loop.index0 }}-Opmerking">{{ proposal.Opmerking }}</textarea>
+              </div>
+              <div class="proposal-meta">
+                <span class="chip">Zekerheid <strong>{{ proposal.Confidence }}</strong></span>
+                <span class="chip">{{ proposal.Reason }}</span>
+              </div>
+            </article>
+          {% else %}
+            <p class="empty-state">Er zijn nog geen opslaanbare taken voorgesteld.</p>
+          {% endfor %}
+        </div>
+        <datalist id="proposal-duration-options">
+          {% for duration in proposal_reference.durations %}
+            <option value="{{ duration }}"></option>
+          {% endfor %}
+        </datalist>
+        <button type="submit">Bewaar gekozen taken</button>
+      </form>
+    </section>
+  {% endif %}
+
+  <section class="panel" id="new-plant">
+    <div class="panel-head">
+      <h2>Nieuwe plant bewaren</h2>
+    </div>
+    <form method="post" action="{{ url_for('create_plant') }}" class="editor-grid">
+      <input name="Plant" placeholder="Naam van de plant" value="{{ new_plant.Plant }}" required>
+      <input name="Type" placeholder="Soort of type" value="{{ new_plant.Type }}">
+      <input name="Snoeigroep" placeholder="Snoeigroep" value="{{ new_plant.Snoeigroep }}">
+      <input name="Standplaats" placeholder="Zon, halfschaduw, schaduw..." value="{{ new_plant.Standplaats }}">
+      <input name="Winterhard" placeholder="Bijvoorbeeld ja of nee" value="{{ new_plant.Winterhard }}">
+      <textarea name="Notitie" placeholder="Handige notitie over deze plant">{{ new_plant.Notitie }}</textarea>
+      <button type="submit">Bewaar plant</button>
+    </form>
+  </section>
+
+  <script>
+    (() => {
+      const plantSelect = document.getElementById("selected_plant_name");
+      const customPlantInput = document.getElementById("custom_plant_name");
+      if (plantSelect && customPlantInput) {
+        const syncCustomVisibility = () => {
+          const customMode = plantSelect.value === "__custom__";
+          customPlantInput.style.display = customMode ? "block" : "none";
+          customPlantInput.required = customMode;
+        };
+
+        syncCustomVisibility();
+        plantSelect.addEventListener("change", syncCustomVisibility);
+      }
+
+      const proposalCheckboxes = Array.from(document.querySelectorAll('.proposal-toggle input[type="checkbox"]'));
+      document.querySelectorAll("[data-proposal-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const shouldCheck = button.dataset.proposalToggle === "all";
+          proposalCheckboxes.forEach((checkbox) => {
+            checkbox.checked = shouldCheck;
+          });
+        });
+      });
+    })();
+  </script>
 
   <section class="card-grid">
     {% for plant in plants %}

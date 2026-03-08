@@ -1,4 +1,4 @@
-# Garden Flow
+# TuinKompas
 
 Een Flask-app voor tuinbeheer met Firebase/Firestore als primaire opslag. Het Excelbestand `professioneel_tuinbeheer_snoeiplan_verrijkt.xlsx` wordt alleen nog gebruikt als eerste importbron om de app te vullen.
 
