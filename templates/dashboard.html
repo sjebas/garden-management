@@ -115,6 +115,42 @@
   <section class="dashboard-grid secondary">
     <article class="panel">
       <div class="panel-head">
+        <div>
+          <h2>Werk op de kaart</h2>
+          <p class="task-note">Alleen de planten met open werk in deze week.</p>
+        </div>
+        <a href="{{ url_for('garden_map') }}">Open volledige kaart</a>
+      </div>
+      {% if garden_map.BackgroundPath and weekly_map_pins %}
+        <div class="dashboard-map-stage">
+          <div class="dashboard-map-surface">
+            <img src="{{ url_for('garden_map_background') }}" alt="Kaart van de tuin">
+            {% for pin in weekly_map_pins %}
+              <a
+                class="garden-pin garden-pin-{{ pin.pin_variant }} dashboard-garden-pin"
+                href="{{ url_for('plant_detail', plant_name=pin.plant) }}"
+                style="left: {{ '%.2f'|format(pin.x) }}%; top: {{ '%.2f'|format(pin.y) }}%;"
+                title="{{ pin.plant }}{% if pin.label %} - {{ pin.label }}{% endif %}"
+              >
+                {% if pin.image_url %}
+                  <img src="{{ pin.image_url }}" alt="{{ pin.plant }}">
+                {% else %}
+                  <span>{{ pin.plant[:1] }}</span>
+                {% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        </div>
+        <p class="task-note">{{ weekly_map_pins|length }} plek{% if weekly_map_pins|length != 1 %}ken{% endif %} met werk deze week.</p>
+      {% elif garden_map.BackgroundPath %}
+        <p class="empty-state">Voor deze week zijn er geen open taken op de kaart.</p>
+      {% else %}
+        <p class="empty-state">Upload eerst een tuinkaart om hier een weekoverzicht op kaart te zien.</p>
+      {% endif %}
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
         <h2>Verdeling van de taken</h2>
       </div>
       <div class="chip-cloud">

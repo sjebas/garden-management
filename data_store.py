@@ -39,6 +39,38 @@ def _normalize_locations(values: object, fallback_x: object = "", fallback_y: ob
     return normalized
 
 
+def _normalize_aliases(values: object) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [_clean(item) for item in values if _clean(item)]
+
+
+def _normalize_task_templates(values: object) -> list[dict[str, str]]:
+    templates = []
+    if not isinstance(values, list):
+        return templates
+    for item in values:
+        if not isinstance(item, dict):
+            continue
+        template = {
+            "month": _clean(item.get("month", "")),
+            "week": _clean(item.get("week", "")),
+            "category": _clean(item.get("category", "")),
+            "action": _clean(item.get("action", "")),
+            "priority": _clean(item.get("priority", "")),
+            "duration": _clean(item.get("duration", "")),
+            "note": _clean(item.get("note", "")),
+        }
+        if template["month"] and template["action"]:
+            templates.append(template)
+    return templates
+
+
+def _normalize_library_key(value: object) -> str:
+    text = _clean(value).lower()
+    return re.sub(r"[^a-z0-9]+", "", text)
+
+
 def _task_sort_key(task: dict[str, str]) -> tuple[int, int, int, str]:
     month_order = {
         "Januari": 0,
@@ -74,6 +106,7 @@ def _default_plant_record(values: dict[str, str], plant_id: str | None = None) -
         "Standplaats": values.get("Standplaats", ""),
         "Winterhard": values.get("Winterhard", ""),
         "Notitie": values.get("Notitie", ""),
+        "LibraryPlantId": _clean(values.get("LibraryPlantId", "")),
         "MapX": locations[0]["x"] if locations else _clean(values.get("MapX", "")),
         "MapY": locations[0]["y"] if locations else _clean(values.get("MapY", "")),
         "MapLocations": locations,
@@ -94,6 +127,23 @@ def _default_task_record(values: dict[str, str], plant_id: str) -> dict[str, str
         "Duur": values.get("Duur", ""),
         "Opmerking": values.get("Opmerking", ""),
         "DashboardVolgorde": values.get("DashboardVolgorde", ""),
+    }
+
+
+def _default_library_plant_record(values: dict[str, object], library_id: str | None = None) -> dict[str, object]:
+    return {
+        "id": _clean(library_id or values.get("id", "") or uuid4().hex),
+        "CanonicalName": _clean(values.get("CanonicalName", values.get("canonical_name", ""))),
+        "Aliases": _normalize_aliases(values.get("Aliases", values.get("aliases", []))),
+        "Type": _clean(values.get("Type", values.get("type", ""))),
+        "Summary": _clean(values.get("Summary", values.get("summary", ""))),
+        "YearRoundMaintenance": _normalize_aliases(values.get("YearRoundMaintenance", values.get("year_round_maintenance", []))),
+        "TaskTemplates": _normalize_task_templates(values.get("TaskTemplates", values.get("task_templates", []))),
+        "ImageUrl": _clean(values.get("ImageUrl", values.get("image_url", ""))),
+        "ImageSourceUrl": _clean(values.get("ImageSourceUrl", values.get("image_source_url", ""))),
+        "ImageCredit": _clean(values.get("ImageCredit", values.get("image_credit", ""))),
+        "ReviewStatus": _clean(values.get("ReviewStatus", values.get("review_status", "reviewed")) or "reviewed"),
+        "SourceNotes": _clean(values.get("SourceNotes", values.get("source_notes", ""))),
     }
 
 
@@ -168,6 +218,26 @@ class BaseStore(ABC):
     def move_plant_location(self, name: str, location_id: str, x: str, y: str) -> dict[str, str]:
         raise NotImplementedError
 
+    @abstractmethod
+    def ensure_library_seeded(self, plants: list[dict[str, object]]) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_library_plants(self) -> list[dict[str, object]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_library_plant(self, library_id: str) -> dict[str, object] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def find_library_plant_by_name(self, name: str) -> dict[str, object] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_plant_library_link(self, name: str, library_id: str) -> dict[str, str]:
+        raise NotImplementedError
+
 
 class FileStore(BaseStore):
     def __init__(self, path: Path) -> None:
@@ -192,7 +262,12 @@ class FileStore(BaseStore):
                 plant_id = plant["id"]
             seeded_tasks.append(_default_task_record(item, plant_id))
 
-        payload = {"plants": seeded_plants, "tasks": seeded_tasks, "garden_map": _default_garden_map_record({})}
+        payload = {
+            "plants": seeded_plants,
+            "tasks": seeded_tasks,
+            "garden_map": _default_garden_map_record({}),
+            "library_plants": [],
+        }
         self._write(payload)
 
     def list_plants(self) -> list[dict[str, str]]:
@@ -249,14 +324,25 @@ class FileStore(BaseStore):
         remaining_plants = [item for item in payload["plants"] if item["id"] != plant["id"]]
         removed_tasks = [task for task in payload["tasks"] if task["PlantId"] == plant["id"]]
         remaining_tasks = [task for task in payload["tasks"] if task["PlantId"] != plant["id"]]
-        self._write({"plants": remaining_plants, "tasks": remaining_tasks, "garden_map": payload["garden_map"]})
+        self._write(
+            {
+                "plants": remaining_plants,
+                "tasks": remaining_tasks,
+                "garden_map": payload["garden_map"],
+                "library_plants": payload["library_plants"],
+            }
+        )
         return plant, len(removed_tasks)
 
     def ensure_plant(self, name: str) -> dict[str, str]:
         plant = self.get_plant_by_name(name)
         if plant is not None:
             return plant
-        return self.create_plant({"Plant": name})
+        library_match = self.find_library_plant_by_name(name)
+        values = {"Plant": name}
+        if library_match:
+            values["LibraryPlantId"] = str(library_match["id"])
+        return self.create_plant(values)
 
     def create_task(self, values: dict[str, str]) -> dict[str, str]:
         payload = self._read()
@@ -345,17 +431,58 @@ class FileStore(BaseStore):
                 return plant
         raise ValueError("Locatie niet gevonden.")
 
+    def ensure_library_seeded(self, plants: list[dict[str, object]]) -> None:
+        payload = self._read()
+        existing = {item["id"]: item for item in payload["library_plants"]}
+        merged = []
+        for item in plants:
+            default_item = _default_library_plant_record(item)
+            merged.append(_default_library_plant_record({**existing.get(default_item["id"], {}), **default_item}, default_item["id"]))
+        payload["library_plants"] = merged
+        self._write(payload)
+
+    def list_library_plants(self) -> list[dict[str, object]]:
+        return self._read()["library_plants"]
+
+    def get_library_plant(self, library_id: str) -> dict[str, object] | None:
+        return next((item for item in self.list_library_plants() if item["id"] == library_id), None)
+
+    def find_library_plant_by_name(self, name: str) -> dict[str, object] | None:
+        normalized = _normalize_library_key(name)
+        if not normalized:
+            return None
+        for item in self.list_library_plants():
+            if _normalize_library_key(item["CanonicalName"]) == normalized:
+                return item
+            if normalized in {_normalize_library_key(alias) for alias in item.get("Aliases", [])}:
+                return item
+        return None
+
+    def update_plant_library_link(self, name: str, library_id: str) -> dict[str, str]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        if library_id and not any(item["id"] == library_id for item in payload["library_plants"]):
+            raise ValueError("Bibliotheekplant niet gevonden.")
+        plant["LibraryPlantId"] = _clean(library_id)
+        self._write(payload)
+        return plant
+
     def _read(self) -> dict[str, list[dict[str, str]]]:
         if not self.path.exists():
-            return {"plants": [], "tasks": [], "garden_map": _default_garden_map_record({})}
+            return {"plants": [], "tasks": [], "garden_map": _default_garden_map_record({}), "library_plants": []}
         payload = json.loads(self.path.read_text(encoding="utf-8"))
         payload.setdefault("plants", [])
         payload.setdefault("tasks", [])
         payload.setdefault("garden_map", _default_garden_map_record({}))
+        payload.setdefault("library_plants", [])
         for plant in payload["plants"]:
             plant["MapLocations"] = _normalize_locations(plant.get("MapLocations"), plant.get("MapX", ""), plant.get("MapY", ""))
             plant.setdefault("MapX", "")
             plant.setdefault("MapY", "")
+            plant.setdefault("LibraryPlantId", "")
+        payload["library_plants"] = [_default_library_plant_record(item) for item in payload["library_plants"]]
         return payload
 
     def _write(self, payload: dict[str, object]) -> None:
@@ -371,6 +498,7 @@ class FirestoreStore(BaseStore):
         self.prefix = collection_prefix.strip() or "garden"
         self.plants_collection = self.client.collection(f"{self.prefix}_plants")
         self.tasks_collection = self.client.collection(f"{self.prefix}_tasks")
+        self.library_collection = self.client.collection(f"{self.prefix}_library_plants")
         self.settings_collection = self.client.collection(f"{self.prefix}_settings")
 
     def ensure_seeded(self, plants: list[dict[str, str]], tasks: list[dict[str, str]]) -> None:
@@ -398,6 +526,13 @@ class FirestoreStore(BaseStore):
 
         batch.commit()
 
+    def ensure_library_seeded(self, plants: list[dict[str, object]]) -> None:
+        batch = self.client.batch()
+        for item in plants:
+            library_item = _default_library_plant_record(item)
+            batch.set(self.library_collection.document(library_item["id"]), library_item, merge=True)
+        batch.commit()
+
     def list_plants(self) -> list[dict[str, str]]:
         items = []
         for doc in self.plants_collection.stream():
@@ -407,6 +542,9 @@ class FirestoreStore(BaseStore):
             payload["MapY"] = payload["MapLocations"][0]["y"] if payload["MapLocations"] else _clean(payload.get("MapY", ""))
             items.append(payload)
         return items
+
+    def list_library_plants(self) -> list[dict[str, object]]:
+        return [_default_library_plant_record(doc.to_dict(), doc.id) for doc in self.library_collection.stream()]
 
     def list_tasks(self) -> list[dict[str, str]]:
         return [doc.to_dict() for doc in self.tasks_collection.stream()]
@@ -418,6 +556,21 @@ class FirestoreStore(BaseStore):
     def get_task(self, task_id: str) -> dict[str, str] | None:
         doc = self.tasks_collection.document(task_id).get()
         return doc.to_dict() if doc.exists else None
+
+    def get_library_plant(self, library_id: str) -> dict[str, object] | None:
+        doc = self.library_collection.document(library_id).get()
+        return _default_library_plant_record(doc.to_dict(), doc.id) if doc.exists else None
+
+    def find_library_plant_by_name(self, name: str) -> dict[str, object] | None:
+        normalized = _normalize_library_key(name)
+        if not normalized:
+            return None
+        for item in self.list_library_plants():
+            if _normalize_library_key(item["CanonicalName"]) == normalized:
+                return item
+            if normalized in {_normalize_library_key(alias) for alias in item.get("Aliases", [])}:
+                return item
+        return None
 
     def create_plant(self, values: dict[str, str]) -> dict[str, str]:
         if self.get_plant_by_name(values["Plant"]) is not None:
@@ -463,7 +616,11 @@ class FirestoreStore(BaseStore):
         plant = self.get_plant_by_name(name)
         if plant is not None:
             return plant
-        return self.create_plant({"Plant": name})
+        library_match = self.find_library_plant_by_name(name)
+        values = {"Plant": name}
+        if library_match:
+            values["LibraryPlantId"] = str(library_match["id"])
+        return self.create_plant(values)
 
     def create_task(self, values: dict[str, str]) -> dict[str, str]:
         if self.get_task(values["ID"]) is not None:
@@ -541,6 +698,16 @@ class FirestoreStore(BaseStore):
                 self.plants_collection.document(plant["id"]).set(plant)
                 return plant
         raise ValueError("Locatie niet gevonden.")
+
+    def update_plant_library_link(self, name: str, library_id: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {name}")
+        if library_id and self.get_library_plant(library_id) is None:
+            raise ValueError("Bibliotheekplant niet gevonden.")
+        plant["LibraryPlantId"] = _clean(library_id)
+        self.plants_collection.document(plant["id"]).set(plant)
+        return plant
 
 
 def create_store(backend: str, file_path: Path, project_id: str | None, prefix: str) -> BaseStore:

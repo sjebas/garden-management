@@ -43,13 +43,22 @@
                 style="left: {{ '%.2f'|format(pin.x) }}%; top: {{ '%.2f'|format(pin.y) }}%;"
                 title="{{ pin.plant }}{% if pin.label %} - {{ pin.label }}{% endif %}"
                 data-plant-name="{{ pin.plant }}"
+                data-location-label="{{ pin.label }}"
                 data-location-id="{{ pin.location_id }}"
                 data-move-url="{{ url_for('move_plant_map_location') }}"
               >
-                <span>{{ pin.plant[:1] }}</span>
+                {% if pin.image_url %}
+                  <img src="{{ pin.image_url }}" alt="{{ pin.plant }}">
+                {% else %}
+                  <span>{{ pin.plant[:1] }}</span>
+                {% endif %}
               </button>
             {% endfor %}
             <span class="garden-pin garden-pin-preview" id="garden-pin-preview" hidden><span>+</span></span>
+            <div class="garden-pin-popover" id="garden-pin-popover" hidden>
+              <strong id="garden-pin-popover-name"></strong>
+              <span id="garden-pin-popover-label"></span>
+            </div>
           </div>
         </div>
       {% else %}
@@ -141,7 +150,11 @@
       const previewPin = document.getElementById("garden-pin-preview");
       const readout = document.getElementById("map-position-readout");
       const saveButton = document.getElementById("map-save-button");
+      const popover = document.getElementById("garden-pin-popover");
+      const popoverName = document.getElementById("garden-pin-popover-name");
+      const popoverLabel = document.getElementById("garden-pin-popover-label");
       let dragState = null;
+      let activePopoverPin = null;
 
       if (!mapSurface || !xInput || !yInput || !previewPin || !readout || !saveButton) {
         return;
@@ -169,6 +182,10 @@
         previewPin.style.left = `${boundedX.toFixed(2)}%`;
         previewPin.style.top = `${boundedY.toFixed(2)}%`;
         previewPin.hidden = false;
+        if (popover) {
+          popover.hidden = true;
+          activePopoverPin = null;
+        }
         readout.textContent = `Gekozen plek: ${boundedX.toFixed(1)}% van links, ${boundedY.toFixed(1)}% van boven`;
         saveButton.disabled = false;
       });
@@ -199,6 +216,18 @@
         }
       };
 
+      const showPopover = (pin) => {
+        if (!popover || !popoverName || !popoverLabel) {
+          return;
+        }
+        popoverName.textContent = pin.dataset.plantName || "";
+        popoverLabel.textContent = pin.dataset.locationLabel || "Tik en sleep om te verplaatsen";
+        popover.style.left = pin.style.left;
+        popover.style.top = pin.style.top;
+        popover.hidden = false;
+        activePopoverPin = pin;
+      };
+
       mapSurface.querySelectorAll(".garden-pin[data-location-id]").forEach((pin) => {
         const startDrag = (event) => {
           event.preventDefault();
@@ -211,10 +240,32 @@
             locationId: pin.dataset.locationId,
             moveUrl: pin.dataset.moveUrl,
           };
+          if (popover) {
+            popover.hidden = true;
+          }
           pin.classList.add("garden-pin-dragging");
         };
 
         pin.addEventListener("pointerdown", startDrag);
+        pin.addEventListener("click", (event) => {
+          event.stopPropagation();
+          if (dragState) {
+            return;
+          }
+          if (activePopoverPin === pin && popover && !popover.hidden) {
+            popover.hidden = true;
+            activePopoverPin = null;
+            return;
+          }
+          showPopover(pin);
+        });
+      });
+
+      mapSurface.addEventListener("click", () => {
+        if (popover) {
+          popover.hidden = true;
+          activePopoverPin = null;
+        }
       });
 
       window.addEventListener("pointermove", (event) => {
@@ -234,6 +285,7 @@
         }
         dragState.pin.classList.remove("garden-pin-dragging");
         await saveMovedPin();
+        showPopover(dragState.pin);
         dragState = null;
       });
     })();

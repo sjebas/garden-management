@@ -1,0 +1,122 @@
+[
+  {
+    "id": "crocus",
+    "canonical_name": "Crocus",
+    "aliases": ["Krokus"],
+    "type": "Bolgewas",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Purple%20crocus.jpg?width=900",
+    "image_source_url": "https://commons.wikimedia.org/wiki/File:Purple_crocus.jpg",
+    "image_credit": "Wikimedia Commons",
+    "summary": "Vroege voorjaarsbloeier die na de winter snel kleur geeft. Het belangrijkste is dat het blad na de bloei rustig mag afsterven zodat de bol energie opslaat voor volgend jaar.",
+    "year_round_maintenance": [
+      "Laat in het voorjaar het blad volledig afrijpen voordat je het opruimt.",
+      "Houd de grond in rustperiodes eerder droog dan nat.",
+      "Plant of verjong bollen in de herfst op een zonnige tot halfschaduwrijke plek.",
+      "Controleer in de winter vooral op natte, slecht drainerende grond."
+    ],
+    "task_templates": [
+      {"month": "Maart", "week": "2", "category": "Controle", "action": "Geniet van de bloei en controleer of de bloemen netjes openkomen.", "priority": "Laag", "duration": "5 min", "note": "Alleen observeren en beschadigde bloemen noteren."},
+      {"month": "April", "week": "3", "category": "Onderhoud", "action": "Laat het blad volledig afsterven en knip het nog niet weg.", "priority": "Hoog", "duration": "5 min", "note": "Belangrijk voor de energieopslag van de bol."},
+      {"month": "September", "week": "2", "category": "Onderhoud", "action": "Plant nieuwe krokusbollen of vul lege plekken aan.", "priority": "Middel", "duration": "15 min", "note": "Gebruik goed doorlatende grond."},
+      {"month": "December", "week": "1", "category": "Controle", "action": "Controleer of de plek niet te nat blijft tijdens de winter.", "priority": "Laag", "duration": "5 min", "note": "Voorkom bolrot door stilstaand water."}
+    ],
+    "review_status": "reviewed",
+    "source_notes": "Starterset voor bloembollen"
+  },
+  {
+    "id": "fuchsia",
+    "canonical_name": "Fuchsia",
+    "aliases": ["Bellenplant"],
+    "type": "Heester / kuipplant",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Fuchsia%20plant.jpg?width=900",
+    "image_source_url": "https://commons.wikimedia.org/wiki/File:Fuchsia_plant.jpg",
+    "image_credit": "Wikimedia Commons",
+    "summary": "Fuchsia bloeit rijk als je regelmatig snoeit, water geeft en uitgebloeide delen verwijdert. In pot vraagt deze plant in warme periodes duidelijk meer aandacht.",
+    "year_round_maintenance": [
+      "Snoei in het voorjaar stevig terug voor compacte groei.",
+      "Geef in het groeiseizoen regelmatig water, zeker in pot.",
+      "Voed licht bij tijdens de bloei voor een lange bloeiperiode.",
+      "Bescherm vorstgevoelige soorten tijdig in het najaar."
+    ],
+    "task_templates": [
+      {"month": "Maart", "week": "2", "category": "Snoeien", "action": "Snoei de plant stevig terug tot circa een derde voor compacte groei.", "priority": "Hoog", "duration": "30 min", "note": "Belangrijkste snoeimoment van het jaar."},
+      {"month": "Mei", "week": "2", "category": "Bemesten", "action": "Geef een lichte voeding voor een sterke en lange bloei.", "priority": "Middel", "duration": "10 min", "note": "Vooral nuttig bij potplanten."},
+      {"month": "Juli", "week": "1", "category": "Water geven", "action": "Controleer meerdere keren per week of de kluit voldoende vochtig blijft.", "priority": "Hoog", "duration": "10 min", "note": "Zeker nodig bij warm weer en planten in pot."},
+      {"month": "September", "week": "3", "category": "Onderhoud", "action": "Verwijder uitgebloeide bloemen en zwakke scheuten om de bloei gaande te houden.", "priority": "Middel", "duration": "15 min", "note": "Kleine onderhoudsbeurt."},
+      {"month": "November", "week": "1", "category": "Beschermen", "action": "Zet vorstgevoelige fuchsia's beschut of winterklaar.", "priority": "Hoog", "duration": "20 min", "note": "Belangrijk voor soorten die niet volledig winterhard zijn."}
+    ],
+    "review_status": "reviewed",
+    "source_notes": "Gebaseerd op veelvoorkomende tuin- en kuipfuchsia's"
+  },
+  {
+    "id": "boerenhortensia",
+    "canonical_name": "Boerenhortensia",
+    "aliases": ["Hydrangea macrophylla", "Hortensia"],
+    "type": "Heester",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Hydrangea_macrophylla_plant.jpg?width=900",
+    "image_source_url": "https://commons.wikimedia.org/wiki/File:Hydrangea_macrophylla_plant.jpg",
+    "image_credit": "Wikimedia Commons",
+    "summary": "Boerenhortensia bloeit op oud hout. Daarom snoei je terughoudend en richt je je vooral op dode toppen, uitgebloeide schermen en voldoende vocht in warme periodes.",
+    "year_round_maintenance": [
+      "Snoei in het voorjaar alleen dode toppen en oude bloemen weg.",
+      "Houd de grond vochtig in droge, warme periodes.",
+      "Geef bij arme grond in het voorjaar een lichte voeding.",
+      "Bescherm jonge knoppen bij late nachtvorst."
+    ],
+    "task_templates": [
+      {"month": "Maart", "week": "2", "category": "Snoeien", "action": "Knip oude bloemen weg tot net boven het eerste sterke knoppenpaar en verwijder dode takken.", "priority": "Hoog", "duration": "20 min", "note": "Niet te diep snoeien, want de plant bloeit op oud hout."},
+      {"month": "Mei", "week": "1", "category": "Beschermen", "action": "Controleer jonge knoppen op schade door late vorst en bescherm indien nodig tijdelijk.", "priority": "Middel", "duration": "10 min", "note": "Vooral relevant bij koude nachten."},
+      {"month": "Juli", "week": "2", "category": "Water geven", "action": "Controleer of de hortensia voldoende vocht krijgt tijdens warme weken.", "priority": "Hoog", "duration": "10 min", "note": "Laat de plant niet langdurig droog staan."},
+      {"month": "Augustus", "week": "4", "category": "Onderhoud", "action": "Verwijder alleen duidelijk zwakke of beschadigde scheuten na de bloei.", "priority": "Laag", "duration": "10 min", "note": "Houd de plant open en gezond."}
+    ],
+    "review_status": "reviewed",
+    "source_notes": "Starterset voor Hydrangea macrophylla"
+  },
+  {
+    "id": "cotoneaster-horizontalis",
+    "canonical_name": "Cotoneaster horizontalis",
+    "aliases": ["Dwergmispel"],
+    "type": "Heester / bodembedekker",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Cotoneaster%20horizontalis%20Tom%20Thumb%201zz.jpg?width=900",
+    "image_source_url": "https://commons.wikimedia.org/wiki/File:Cotoneaster_horizontalis_Tom_Thumb_1zz.jpg",
+    "image_credit": "Wikimedia Commons",
+    "summary": "Cotoneaster horizontalis vraagt vooral lichte vormsnoei en controle op ongewenste of kruisende scheuten. Het is een sterke plant die met weinig ingrepen netjes blijft.",
+    "year_round_maintenance": [
+      "Knip na de bloei of vroeg in het voorjaar lichte correcties terug.",
+      "Houd de gelaagde vorm open door ongewenste scheuten tijdig weg te halen.",
+      "Controleer af en toe op kruisende takken en dichtgroeien tegen muren of paden.",
+      "Water geven is meestal alleen nodig bij langdurige droogte na aanplant."
+    ],
+    "task_templates": [
+      {"month": "Maart", "week": "3", "category": "Snoeien", "action": "Knip uitstekende of ongewenste scheuten licht terug en behoud de gelaagde vorm.", "priority": "Middel", "duration": "15 min", "note": "Lichte onderhoudssnoei."},
+      {"month": "Mei", "week": "4", "category": "Controle", "action": "Controleer of takken paden, muren of andere planten overnemen.", "priority": "Laag", "duration": "10 min", "note": "Werk bij waar nodig."},
+      {"month": "September", "week": "2", "category": "Onderhoud", "action": "Verwijder kruisende of beschadigde takken voor een open plantstructuur.", "priority": "Middel", "duration": "10 min", "note": "Korte najaarsbeurt."}
+    ],
+    "review_status": "reviewed",
+    "source_notes": "Starterset voor veelgebruikte bodembedekkende Cotoneaster"
+  },
+  {
+    "id": "paeonia",
+    "canonical_name": "Paeonia",
+    "aliases": ["Pioenroos", "Paeonia lactiflora"],
+    "type": "Vaste plant",
+    "image_url": "https://commons.wikimedia.org/wiki/Special:Redirect/file/Paeonia_lactiflora_2025.jpg?width=900",
+    "image_source_url": "https://commons.wikimedia.org/wiki/File:Paeonia_lactiflora_2025.jpg",
+    "image_credit": "Wikimedia Commons",
+    "summary": "Paeonia houdt van rust, zon en een luchtige standplaats. Het belangrijkste onderhoud bestaat uit controle in het voorjaar en het netjes terugsnijden in het najaar.",
+    "year_round_maintenance": [
+      "Controleer in het voorjaar op gezonde uitlopers en late vorst.",
+      "Gebruik eventueel ondersteuning bij zware bloemknoppen.",
+      "Verwijder uitgebloeide bloemen in de zomer voor een nettere plant.",
+      "Knip in het najaar blad en stengels terug tot net boven de grond."
+    ],
+    "task_templates": [
+      {"month": "Maart", "week": "2", "category": "Controle", "action": "Controleer op gezonde uitlopers en bescherm jonge scheuten tegen late vorst.", "priority": "Middel", "duration": "10 min", "note": "Vooral bij koude nachten extra belangrijk."},
+      {"month": "Mei", "week": "2", "category": "Onderhoud", "action": "Plaats indien nodig ondersteuning bij zware bloemknoppen.", "priority": "Middel", "duration": "10 min", "note": "Voorkomt omvallen bij regen of wind."},
+      {"month": "Juni", "week": "3", "category": "Onderhoud", "action": "Verwijder uitgebloeide bloemen om de plant netjes te houden.", "priority": "Laag", "duration": "10 min", "note": "Knip alleen de bloemstelen terug."},
+      {"month": "Oktober", "week": "4", "category": "Snoeien", "action": "Knip het afgestorven blad en de stengels terug tot net boven de grond.", "priority": "Hoog", "duration": "15 min", "note": "Ruim het snoeiafval op om ziekten te voorkomen."}
+    ],
+    "review_status": "reviewed",
+    "source_notes": "Starterset voor pioenen in borders"
+  }
+]

@@ -22,6 +22,7 @@ from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, Garde
 
 BASE_DIR = Path(__file__).resolve().parent
 SEED_WORKBOOK_PATH = BASE_DIR / "professioneel_tuinbeheer_snoeiplan_verrijkt.xlsx"
+PLANT_LIBRARY_PATH = BASE_DIR / "data" / "plant_library.json"
 LOCAL_DATA_PATH = Path(
     os.getenv("GARDEN_FILE_STORE_PATH", str(BASE_DIR / "instance" / "garden-data.json"))
 )
@@ -76,6 +77,19 @@ def _seed_store() -> None:
     STORE.ensure_seeded(workbook_data["plants"], workbook_data["tasks"])
 
 
+def _seed_library() -> None:
+    if not PLANT_LIBRARY_PATH.exists():
+        return
+    library_items = json.loads(PLANT_LIBRARY_PATH.read_text(encoding="utf-8"))
+    STORE.ensure_library_seeded(library_items)
+    for plant in STORE.list_plants():
+        if plant.get("LibraryPlantId"):
+            continue
+        match = STORE.find_library_plant_by_name(plant["Plant"])
+        if match:
+            STORE.update_plant_library_link(plant["Plant"], str(match["id"]))
+
+
 def _task_form_values(form) -> dict[str, str]:
     return {field: form.get(field, "").strip() for field in TASK_FIELDS}
 
@@ -96,6 +110,7 @@ def _as_percentage(value: object) -> float | None:
 
 def _plants_with_stats() -> list[dict[str, object]]:
     tasks = STORE.list_tasks()
+    library_items = {str(item["id"]): item for item in STORE.list_library_plants()}
     plants = []
     for plant in STORE.list_plants():
         related_tasks = [task for task in tasks if task["PlantId"] == plant["id"]]
@@ -112,6 +127,11 @@ def _plants_with_stats() -> list[dict[str, object]]:
             elif highest_priority == PRIORITY_ORDER.get("Middel", 1):
                 pin_variant = "medium"
         locations = plant.get("MapLocations", [])
+        library_entry = None
+        if plant.get("LibraryPlantId"):
+            library_entry = library_items.get(str(plant["LibraryPlantId"]))
+        if library_entry is None:
+            library_entry = STORE.find_library_plant_by_name(plant["Plant"])
         plants.append(
             {
                 **plant,
@@ -131,6 +151,7 @@ def _plants_with_stats() -> list[dict[str, object]]:
                 ],
                 "LocationCount": len(locations),
                 "PinVariant": pin_variant,
+                "LibraryEntry": library_entry,
             }
         )
     return sorted(plants, key=lambda plant: str(plant["Plant"]))
@@ -149,6 +170,67 @@ def _load_reference_data() -> dict[str, list[str]]:
         "statuses": ["Open", "Uitgesteld", "Gereed"],
         "months": MONTHS[:],
     }
+
+
+def _library_import_candidates(
+    plant_name: str, library_entry: dict[str, object], tasks: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    existing_signatures = {
+        (task["Plant"], task["Maand"], str(task.get("Week", "")), task["Categorie"], task["Actie"])
+        for task in tasks
+    }
+    candidates = []
+    for template in library_entry.get("TaskTemplates", []):
+        signature = (
+            plant_name,
+            template["month"],
+            template["week"],
+            template["category"],
+            template["action"],
+        )
+        if signature in existing_signatures:
+            continue
+        candidates.append(
+            {
+                "Plant": plant_name,
+                "Maand": template["month"],
+                "Week": template["week"],
+                "Categorie": template["category"] or "Onderhoud",
+                "Actie": template["action"],
+                "Prioriteit": template["priority"] or "Middel",
+                "Status": "Open",
+                "Duur": template["duration"] or "15 min",
+                "Opmerking": template["note"],
+                "DashboardVolgorde": "",
+            }
+        )
+    return candidates
+
+
+def _map_pins_for_plants(plants: list[dict[str, object]]) -> list[dict[str, object]]:
+    pins = []
+    for plant in plants:
+        for index, location in enumerate(plant.get("MapLocations", []), start=1):
+            if location.get("x_value") is None or location.get("y_value") is None:
+                continue
+            pins.append(
+                {
+                    "plant": plant["Plant"],
+                    "location_id": location["id"],
+                    "label": location.get("label", ""),
+                    "x": location["x_value"],
+                    "y": location["y_value"],
+                    "pin_variant": plant["PinVariant"],
+                    "open_tasks": plant["OpenTaken"],
+                    "index": index,
+                    "image_url": (
+                        plant["LibraryEntry"].get("ImageUrl", "")
+                        if plant.get("LibraryEntry")
+                        else ""
+                    ),
+                }
+            )
+    return pins
 
 
 def _monthly_summary(tasks: list[dict[str, str]]) -> list[dict[str, object]]:
@@ -286,6 +368,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["SECRET_KEY"] = os.getenv("FLASK_SECRET_KEY", secrets.token_hex(32))
     _seed_store()
+    _seed_library()
 
     @app.context_processor
     def inject_globals() -> dict[str, object]:
@@ -315,6 +398,7 @@ def create_app() -> Flask:
         )
         open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
         week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
+        garden_map_settings = STORE.get_garden_map()
 
         workload = []
         for item in _plant_workload(plants, tasks):
@@ -328,6 +412,14 @@ def create_app() -> Flask:
                         "high": sum(task["Prioriteit"] == "Hoog" for task in matching),
                     }
                 )
+
+        weekly_map_plant_names = {task["Plant"] for task in open_week_tasks}
+        weekly_map_plants = [
+            plant
+            for plant in plants
+            if plant["Plant"] in weekly_map_plant_names and plant["MapPlaced"]
+        ]
+        weekly_map_pins = _map_pins_for_plants(weekly_map_plants)
 
         summary = _monthly_summary(tasks)
         month_summary = next(entry for entry in summary if entry["month"] == selected_month)
@@ -344,6 +436,8 @@ def create_app() -> Flask:
             open_week_tasks=len(open_week_tasks),
             week_time_budget=_format_minutes(week_minutes),
             workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
+            garden_map=garden_map_settings,
+            weekly_map_pins=weekly_map_pins,
             month_summary=month_summary,
             next_up=_next_up(tasks),
             total_plants=len(plants),
@@ -460,6 +554,7 @@ def create_app() -> Flask:
             for item in analysis_result.get("year_round_maintenance", [])
             if str(item).strip()
         ]
+        proposal_library_entry = STORE.find_library_plant_by_name(resolved_plant_name)
         open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
         week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
 
@@ -493,6 +588,7 @@ def create_app() -> Flask:
                 "identification_confidence": analysis_result.get("identification_confidence", ""),
                 "identification_reason": analysis_result.get("identification_reason", ""),
                 "year_round_maintenance": year_round_maintenance,
+                "library_entry": proposal_library_entry,
                 "all_plant_options": sorted(
                     {
                         option
@@ -667,21 +763,7 @@ def create_app() -> Flask:
         garden_map_settings = STORE.get_garden_map()
         placed_plants = [plant for plant in plants if plant["MapPlaced"]]
         unplaced_plants = [plant for plant in plants if not plant["MapPlaced"]]
-        map_pins = []
-        for plant in placed_plants:
-            for index, location in enumerate(plant["MapLocations"], start=1):
-                map_pins.append(
-                    {
-                        "plant": plant["Plant"],
-                        "location_id": location["id"],
-                        "label": location.get("label", ""),
-                        "x": location["x_value"],
-                        "y": location["y_value"],
-                        "pin_variant": plant["PinVariant"],
-                        "open_tasks": plant["OpenTaken"],
-                        "index": index,
-                    }
-                )
+        map_pins = _map_pins_for_plants(placed_plants)
 
         return render_template(
             "map.html",
@@ -802,6 +884,9 @@ def create_app() -> Flask:
         if not values["Plant"]:
             flash("Plantnaam is verplicht.", "error")
             return redirect(url_for("plants"))
+        library_match = STORE.find_library_plant_by_name(values["Plant"])
+        if library_match:
+            values["LibraryPlantId"] = str(library_match["id"])
 
         try:
             plant = STORE.create_plant(values)
@@ -841,6 +926,12 @@ def create_app() -> Flask:
         tasks = [task for task in STORE.list_tasks() if task["PlantId"] == plant["id"]]
         tasks = sorted(tasks, key=_task_display_sort_key)
         heatmap = next(item for item in _yearly_heatmap([plant], tasks) if item["plant"] == plant["Plant"])
+        library_entry = (
+            STORE.get_library_plant(plant.get("LibraryPlantId", ""))
+            if plant.get("LibraryPlantId")
+            else STORE.find_library_plant_by_name(plant["Plant"])
+        )
+        import_candidates = _library_import_candidates(plant["Plant"], library_entry, tasks) if library_entry else []
 
         return render_template(
             "plant_detail.html",
@@ -848,7 +939,44 @@ def create_app() -> Flask:
             plant=plant,
             tasks=tasks,
             heatmap=heatmap,
+            library_entry=library_entry,
+            import_candidate_count=len(import_candidates),
         )
+
+    @app.post("/plant/<path:plant_name>/library/import")
+    def import_library_tasks(plant_name: str):
+        plant = STORE.get_plant_by_name(plant_name)
+        if plant is None:
+            abort(404)
+
+        library_entry = (
+            STORE.get_library_plant(plant.get("LibraryPlantId", ""))
+            if plant.get("LibraryPlantId")
+            else STORE.find_library_plant_by_name(plant["Plant"])
+        )
+        if library_entry is None:
+            flash("Voor deze plant is nog geen bibliotheekplan gevonden.", "error")
+            return redirect(url_for("plant_detail", plant_name=plant_name))
+
+        if not plant.get("LibraryPlantId"):
+            STORE.update_plant_library_link(plant_name, str(library_entry["id"]))
+
+        tasks = [task for task in STORE.list_tasks() if task["PlantId"] == plant["id"]]
+        candidates = _library_import_candidates(plant["Plant"], library_entry, tasks)
+        if not candidates:
+            flash("Alle standaardtaken voor deze plant staan al in je planning.", "success")
+            return redirect(url_for("plant_detail", plant_name=plant_name))
+
+        existing_ids = [task["ID"] for task in STORE.list_tasks()]
+        created = 0
+        for candidate in candidates:
+            candidate["ID"] = generate_task_id(existing_ids, candidate["Plant"])
+            existing_ids.append(candidate["ID"])
+            STORE.create_task(candidate)
+            created += 1
+
+        flash(f"{created} standaardtaken uit de plantenbibliotheek toegevoegd.", "success")
+        return redirect(url_for("plant_detail", plant_name=plant_name))
 
     @app.post("/plant/<path:plant_name>/save")
     def save_plant(plant_name: str):
@@ -856,6 +984,8 @@ def create_app() -> Flask:
         if not values["Plant"]:
             flash("Plantnaam is verplicht.", "error")
             return redirect(url_for("plant_detail", plant_name=plant_name))
+        library_match = STORE.find_library_plant_by_name(values["Plant"])
+        values["LibraryPlantId"] = str(library_match["id"]) if library_match else ""
 
         try:
             plant = STORE.update_plant(plant_name, values)

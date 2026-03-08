@@ -7,6 +7,17 @@
       <h1>{{ plant.Plant }}</h1>
       <p class="lede">{{ plant.Notitie or "Hier bewaar je alle belangrijke informatie en taken voor deze plant." }}</p>
     </div>
+    {% if library_entry and library_entry.ImageUrl %}
+      <div class="detail-plant-media">
+        <img src="{{ library_entry.ImageUrl }}" alt="{{ plant.Plant }}">
+        {% if library_entry.ImageSourceUrl %}
+          <p class="task-note">
+            Voorbeeldfoto uit
+            <a href="{{ library_entry.ImageSourceUrl }}" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>
+          </p>
+        {% endif %}
+      </div>
+    {% endif %}
     <div class="detail-pills">
       <span class="pill">Snoeigroep: {{ plant.Snoeigroep or "Onbekend" }}</span>
       <span class="pill">Standplaats: {{ plant.Standplaats or "Onbekend" }}</span>
@@ -28,6 +39,44 @@
       <textarea name="Notitie" placeholder="Handige notitie over deze plant">{{ plant.Notitie }}</textarea>
       <button type="submit">Bewaar wijzigingen</button>
     </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Plantenbibliotheek</h2>
+        <p class="task-note">Gebruik een standaard jaarplan als deze plant in de encyclopedie staat.</p>
+      </div>
+    </div>
+    {% if library_entry %}
+      <div class="analysis-summary">
+        <div class="chip-cloud">
+          <span class="chip">Bibliotheekmatch <strong>{{ library_entry.CanonicalName }}</strong></span>
+          <span class="chip">Sjabloontaken <strong>{{ library_entry.TaskTemplates|length }}</strong></span>
+        </div>
+        {% if library_entry.Summary %}
+          <p class="task-note">{{ library_entry.Summary }}</p>
+        {% endif %}
+      </div>
+      {% if library_entry.YearRoundMaintenance %}
+        <div class="tips-list">
+          {% for tip in library_entry.YearRoundMaintenance %}
+            <div class="tip-card">{{ tip }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <form method="post" action="{{ url_for('import_library_tasks', plant_name=plant.Plant) }}">
+        <button type="submit" {% if not import_candidate_count %}class="button-secondary" disabled{% endif %}>
+          {% if import_candidate_count %}
+            Voeg {{ import_candidate_count }} standaardtaken toe
+          {% else %}
+            Alle standaardtaken staan al in je planning
+          {% endif %}
+        </button>
+      </form>
+    {% else %}
+      <p class="empty-state">Voor deze plant is nog geen bibliotheekprofiel beschikbaar. De AI-route blijft gewoon beschikbaar voor maatwerk.</p>
+    {% endif %}
   </section>
 
   <section class="panel panel-danger">

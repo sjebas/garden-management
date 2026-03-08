@@ -70,6 +70,17 @@
         </div>
       </div>
       <div class="analysis-summary">
+        {% if proposal_result.library_entry and proposal_result.library_entry.ImageUrl %}
+          <div class="proposal-plant-media">
+            <img src="{{ proposal_result.library_entry.ImageUrl }}" alt="{{ proposal_result.plant_name }}">
+            {% if proposal_result.library_entry.ImageSourceUrl %}
+              <p class="task-note">
+                Voorbeeldfoto uit
+                <a href="{{ proposal_result.library_entry.ImageSourceUrl }}" target="_blank" rel="noopener noreferrer">Wikimedia Commons</a>
+              </p>
+            {% endif %}
+          </div>
+        {% endif %}
         <div class="chip-cloud">
           <span class="chip">Herkende plant <strong>{{ proposal_result.plant_name }}</strong></span>
           {% if proposal_result.identification_confidence != "" %}
@@ -212,6 +223,11 @@
   <section class="card-grid">
     {% for plant in plants %}
       <article class="plant-card">
+        {% if plant.LibraryEntry and plant.LibraryEntry.ImageUrl %}
+          <div class="plant-card-media">
+            <img src="{{ plant.LibraryEntry.ImageUrl }}" alt="{{ plant.Plant }}">
+          </div>
+        {% endif %}
         <div class="plant-card-head">
           <div>
             <p class="eyebrow">{{ plant.Type or "Plant" }}</p>

@@ -7,6 +7,7 @@ Een Flask-app voor tuinbeheer met Firebase/Firestore als primaire opslag. Het Ex
 - Dashboard met maandselectie, KPI's en eerstvolgende taken
 - Uitgebreide takenlijst met filters
 - Plantregister met detailpagina per plant
+- Eerste versie van een plantenbibliotheek met standaard jaarplannen
 - Jaarplanner met maandritme en taakdruk per plant
 - Wijzigingen in taken en planten worden opgeslagen in Firestore
 
@@ -61,6 +62,7 @@ Belangrijk:
 - In productie wordt `GEMINI_API_KEY` via Secret Manager gekoppeld met secretnaam `gemini-api-key`.
 - De app gebruikt standaard deze modelvolgorde voor slimme invoer: `gemini-3.1-flash-lite-preview`, `gemini-2.5-flash`, `gemini-3-flash-preview`, `gemini-2.5-flash-lite`.
 - Voor de tuinkaart gebruikt de app lokaal een bestand in `instance/`, maar in Cloud Run is een bucket via `GARDEN_MAP_BUCKET` nodig om de achtergrondafbeelding blijvend op te slaan.
+- De eerste encyclopedie-items staan in `data/plant_library.json` en worden bij opstarten als bibliotheek in de gekozen backend geladen.
 
 ## Cloud Run trigger
 

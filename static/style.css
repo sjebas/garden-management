@@ -519,6 +519,32 @@ tr.status-gereed,
   border-radius: var(--radius);
 }
 
+.plant-card-media,
+.detail-plant-media {
+  overflow: hidden;
+  border-radius: 20px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.plant-card-media img,
+.detail-plant-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.detail-plant-media {
+  max-width: 320px;
+}
+
+.detail-plant-media .task-note {
+  margin: 0;
+  padding: 10px 12px 12px;
+}
+
 .plant-card h2 {
   margin-bottom: 0;
 }
@@ -607,6 +633,27 @@ td {
   display: grid;
   gap: 10px;
   margin-bottom: 14px;
+}
+
+.proposal-plant-media {
+  overflow: hidden;
+  max-width: 320px;
+  border-radius: 20px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.proposal-plant-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.proposal-plant-media .task-note {
+  margin: 0;
+  padding: 10px 12px 12px;
 }
 
 .proposal-plant-picker {
@@ -777,6 +824,14 @@ td {
   background: rgba(255, 255, 255, 0.52);
 }
 
+.dashboard-map-stage {
+  overflow: hidden;
+  border-radius: 24px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(255, 255, 255, 0.52);
+  margin-bottom: 12px;
+}
+
 .garden-map-surface {
   position: relative;
   display: block;
@@ -788,10 +843,22 @@ td {
   background: transparent;
 }
 
+.dashboard-map-surface {
+  position: relative;
+}
+
 .garden-map-surface img {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.dashboard-map-surface img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
 }
 
 .garden-pin {
@@ -799,32 +866,41 @@ td {
   z-index: 1;
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
-  margin-top: -17px;
-  margin-left: -17px;
+  width: 42px;
+  height: 42px;
+  margin-top: -21px;
+  margin-left: -21px;
   border-radius: 999px;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 3px solid rgba(255, 255, 255, 0.92);
   box-shadow: 0 10px 24px rgba(32, 49, 39, 0.18);
   padding: 0;
   min-width: 0;
+  overflow: visible;
   color: white;
   cursor: grab;
 }
 
 .garden-pin span {
   color: white;
-  font-size: 0.86rem;
+  font-size: 0.92rem;
   font-weight: 800;
+}
+
+.garden-pin img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  object-fit: cover;
 }
 
 .garden-pin::after {
   content: "";
   position: absolute;
-  bottom: -8px;
+  bottom: -7px;
   left: 50%;
-  width: 10px;
-  height: 10px;
+  width: 9px;
+  height: 9px;
   background: inherit;
   transform: translateX(-50%) rotate(45deg);
 }
@@ -854,6 +930,47 @@ td {
   cursor: grabbing;
   box-shadow: 0 14px 30px rgba(32, 49, 39, 0.28);
   transform: scale(1.05);
+}
+
+.dashboard-garden-pin {
+  width: 34px;
+  height: 34px;
+  margin-top: -17px;
+  margin-left: -17px;
+  border-width: 2px;
+  cursor: pointer;
+}
+
+.dashboard-garden-pin::after {
+  bottom: -6px;
+  width: 8px;
+  height: 8px;
+}
+
+.garden-pin-popover {
+  position: absolute;
+  z-index: 2;
+  min-width: 140px;
+  max-width: 220px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(32, 49, 39, 0.1);
+  background: rgba(255, 251, 245, 0.94);
+  box-shadow: 0 18px 40px rgba(32, 49, 39, 0.16);
+  transform: translate(-50%, calc(-100% - 20px));
+  text-align: left;
+}
+
+.garden-pin-popover strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.garden-pin-popover span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.35;
 }
 
 .map-plant-list {
