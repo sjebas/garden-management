@@ -729,5 +729,10 @@ def _default_garden_map_record(values: dict[str, str]) -> dict[str, str]:
     return {
         "BackgroundPath": _clean(values.get("BackgroundPath", "")),
         "BackgroundMimeType": _clean(values.get("BackgroundMimeType", "")),
+        "LocationName": _clean(values.get("LocationName", "")),
+        "LocationLabel": _clean(values.get("LocationLabel", "")),
+        "Latitude": _clean(values.get("Latitude", "")),
+        "Longitude": _clean(values.get("Longitude", "")),
+        "Timezone": _clean(values.get("Timezone", "")),
         "UpdatedAt": _clean(values.get("UpdatedAt", datetime.utcnow().isoformat())),
     }

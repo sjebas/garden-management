@@ -5,6 +5,7 @@ Een Flask-app voor tuinbeheer met Firebase/Firestore als primaire opslag. Het Ex
 ## Wat de app laat zien
 
 - Dashboard met maandselectie, KPI's en eerstvolgende taken
+- Dashboard met weekoverzicht, kaartpreview en slim tuinweer op basis van de opgeslagen tuinlocatie
 - Uitgebreide takenlijst met filters
 - Plantregister met detailpagina per plant
 - Eerste versie van een plantenbibliotheek met standaard jaarplannen

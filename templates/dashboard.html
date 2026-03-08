@@ -151,6 +151,35 @@
 
     <article class="panel">
       <div class="panel-head">
+        <div>
+          <h2>Tuinweer</h2>
+          <p class="task-note">Handig voor plannen van droog en prettig buitenwerk.</p>
+        </div>
+      </div>
+      {% if weather_forecast and weather_forecast.best_day %}
+        <div class="weather-highlight weather-{{ weather_forecast.best_day.score_variant }}">
+          <strong>Beste moment: {{ weather_forecast.best_day.label }}</strong>
+          <span>{{ weather_forecast.best_day.score_label }} · {{ weather_forecast.best_day.summary }}</span>
+        </div>
+        <div class="weather-grid">
+          {% for day in weather_forecast.days %}
+            <div class="weather-day weather-{{ day.score_variant }}">
+              <strong>{{ day.label }}</strong>
+              <span>{{ day.score_label }}</span>
+              <small>{{ day.min_temp|round(0)|int if day.min_temp is not none else "-" }}° / {{ day.max_temp|round(0)|int if day.max_temp is not none else "-" }}°</small>
+              <small>{{ day.rain_probability if day.rain_probability is not none else "-" }}% regen · {{ day.wind_speed|round(0)|int if day.wind_speed is not none else "-" }} km/u</small>
+            </div>
+          {% endfor %}
+        </div>
+      {% elif weather_error %}
+        <p class="empty-state">{{ weather_error }}</p>
+      {% else %}
+        <p class="empty-state">Sla eerst je tuinlocatie op in de kaartweergave om hier tuinweer te zien.</p>
+      {% endif %}
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
         <h2>Verdeling van de taken</h2>
       </div>
       <div class="chip-cloud">

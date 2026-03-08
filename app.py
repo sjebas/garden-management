@@ -18,6 +18,7 @@ from data_store import create_store, generate_task_id
 from garden_map_assets import GardenMapAssetStore
 from gemini_helper import GeminiError, GeminiQuotaError, analyze_plant_image
 from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, GardenWorkbook
+from weather_service import WeatherServiceError, fetch_garden_forecast, geocode_location
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -399,6 +400,17 @@ def create_app() -> Flask:
         open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
         week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
         garden_map_settings = STORE.get_garden_map()
+        weather_forecast = None
+        weather_error = ""
+        if garden_map_settings.get("Latitude") and garden_map_settings.get("Longitude"):
+            try:
+                weather_forecast = fetch_garden_forecast(
+                    latitude=garden_map_settings.get("Latitude", ""),
+                    longitude=garden_map_settings.get("Longitude", ""),
+                    timezone=garden_map_settings.get("Timezone", "") or "auto",
+                )
+            except WeatherServiceError as exc:
+                weather_error = str(exc)
 
         workload = []
         for item in _plant_workload(plants, tasks):
@@ -438,6 +450,8 @@ def create_app() -> Flask:
             workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
             garden_map=garden_map_settings,
             weekly_map_pins=weekly_map_pins,
+            weather_forecast=weather_forecast,
+            weather_error=weather_error,
             month_summary=month_summary,
             next_up=_next_up(tasks),
             total_plants=len(plants),
@@ -813,6 +827,31 @@ def create_app() -> Flask:
             return redirect(url_for("garden_map"))
 
         flash("De tuinfoto staat klaar als achtergrond van je kaart.", "success")
+        return redirect(url_for("garden_map"))
+
+    @app.post("/map/location/save")
+    def save_garden_location():
+        location_query = request.form.get("location_name", "").strip()
+        if not location_query:
+            flash("Vul een plaats of adres in voor je tuin.", "error")
+            return redirect(url_for("garden_map"))
+        try:
+            result = geocode_location(location_query)
+            STORE.save_garden_map(
+                {
+                    "LocationName": result["location_name"],
+                    "LocationLabel": result["location_label"],
+                    "Latitude": result["latitude"],
+                    "Longitude": result["longitude"],
+                    "Timezone": result["timezone"],
+                    "UpdatedAt": datetime.utcnow().isoformat(),
+                }
+            )
+        except WeatherServiceError as exc:
+            flash(str(exc), "error")
+            return redirect(url_for("garden_map"))
+
+        flash(f"De tuinlocatie staat nu op {result['location_label']}.", "success")
         return redirect(url_for("garden_map"))
 
     @app.get("/map/background")

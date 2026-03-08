@@ -73,6 +73,28 @@
       <section class="panel">
         <div class="panel-head">
           <div>
+            <h2>Tuinlocatie</h2>
+            <p class="task-note">Gebruik je plaats of adres voor slim tuinweer op het dashboard.</p>
+          </div>
+        </div>
+        <form method="post" action="{{ url_for('save_garden_location') }}" class="editor-grid">
+          <input
+            type="text"
+            name="location_name"
+            value="{{ garden_map.LocationName or garden_map.LocationLabel }}"
+            placeholder="Bijvoorbeeld Utrecht of straat + plaats"
+            required
+          >
+          <button type="submit">Bewaar tuinlocatie</button>
+        </form>
+        {% if garden_map.LocationLabel %}
+          <p class="task-note">Huidige locatie: {{ garden_map.LocationLabel }}</p>
+        {% endif %}
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <h2>Achtergrond uploaden</h2>
             <p class="task-note">Je kunt later altijd een nieuw beeld uploaden.</p>
           </div>
