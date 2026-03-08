@@ -12,7 +12,7 @@ Een Flask-app voor tuinbeheer met Firebase/Firestore als primaire opslag. Het Ex
 
 ## Starten
 
-1. Maak een virtuele omgeving:
+1. Maak een virtuele omgeving door:
 
 ```bash
 python3 -m venv .venv
