@@ -3,18 +3,141 @@
 {% block content %}
   <section class="hero">
     <div>
-      <p class="eyebrow">Seizoensoverzicht</p>
-      <h1>Alles voor de tuin, overzichtelijk op een plek.</h1>
-      <p class="lede">Bekijk wat er deze maand speelt, voeg slim nieuwe taken toe en houd per plant makkelijk overzicht.</p>
+      <p class="eyebrow">Weekoverzicht</p>
+      <h1>Dit vraagt deze week aandacht in de tuin.</h1>
+      <p class="lede">Open de app en zie meteen wat er nu moet gebeuren, wat nog openstaat en hoeveel tijd het ongeveer kost.</p>
     </div>
-    <form method="get" class="month-picker">
-      <label for="month">Gekozen maand</label>
-      <select id="month" name="month" onchange="this.form.submit()">
-        {% for month in months %}
-          <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }}</option>
-        {% endfor %}
-      </select>
+    <form method="get" class="month-picker week-picker">
+      <label for="month">Periode</label>
+      <div class="period-picker">
+        <select id="month" name="month" onchange="this.form.submit()">
+          {% for month in months %}
+            <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }}</option>
+          {% endfor %}
+        </select>
+        <select id="week" name="week" onchange="this.form.submit()">
+          {% for week in weeks %}
+            <option value="{{ week }}" {% if week == selected_week %}selected{% endif %}>Week {{ week }}</option>
+          {% endfor %}
+        </select>
+      </div>
     </form>
+  </section>
+
+  <section class="stat-grid">
+    <article class="stat-card">
+      <span>Planten in de app</span>
+      <strong>{{ total_plants }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Taken in week {{ selected_week }}</span>
+      <strong>{{ tasks|length }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Nog te doen deze week</span>
+      <strong>{{ open_week_tasks }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Geschatte tijd deze week</span>
+      <strong>{{ week_time_budget }}</strong>
+    </article>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Wat er speelt in {{ selected_month }}, week {{ selected_week }}</h2>
+        <a href="{{ url_for('tasks', month=selected_month) }}">Bekijk alles</a>
+      </div>
+      <div class="task-list">
+        {% for task in tasks %}
+          <div class="task-item status-{{ task.Status|lower }}">
+            <div>
+              <p class="task-title">{{ task.Plant }}</p>
+              <p class="task-meta">Week {{ task.Week }} • {{ task.Categorie }} • {{ task.Duur }}</p>
+            </div>
+            <div>
+              <span class="badge priority-{{ task.Prioriteit|lower }}">{{ task.Prioriteit }}</span>
+              <span class="badge neutral">{{ task.Status }}</span>
+            </div>
+            <p class="task-action">{{ task.Actie }}</p>
+            {% if task.Opmerking %}
+              <p class="task-note">{{ task.Opmerking }}</p>
+            {% endif %}
+            <div class="task-actions">
+              <form method="post" action="{{ url_for('update_task_status', task_id=task.ID) }}">
+                <input type="hidden" name="status" value="{% if task.Status == 'Gereed' %}Open{% else %}Gereed{% endif %}">
+                <input type="hidden" name="next" value="{{ request.full_path }}">
+                <button type="submit" class="{% if task.Status == 'Gereed' %}button-secondary{% endif %}">
+                  {% if task.Status == "Gereed" %}Zet terug naar open{% else %}Markeer als gedaan{% endif %}
+                </button>
+              </form>
+              <a class="table-link" href="{{ url_for('task_detail', task_id=task.ID) }}">Open taak</a>
+            </div>
+          </div>
+        {% else %}
+          <p class="empty-state">Voor deze week staan er nog geen taken gepland.</p>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Overzicht per plant</h2>
+        <a href="{{ url_for('plants') }}">Alle planten</a>
+      </div>
+      <div class="workload-list">
+        {% for item in workload %}
+          <a class="workload-row" href="{{ url_for('plant_detail', plant_name=item.plant) }}">
+            <span>{{ item.plant }}</span>
+            <span>{{ item.tasks }} taken</span>
+            <span>{{ item.open }} open</span>
+            <span>{{ item.high }} hoog</span>
+          </a>
+        {% else %}
+          <p class="empty-state">Nog geen plantoverzicht beschikbaar.</p>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid secondary">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Verdeling van de taken</h2>
+      </div>
+      <div class="chip-cloud">
+        {% if month_summary %}
+          {% for category, count in month_summary.categories.items() %}
+            <span class="chip">{{ category }} <strong>{{ count }}</strong></span>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Wat komt hierna</h2>
+      </div>
+      <div class="mini-list">
+        {% for task in next_up %}
+          <div class="mini-item">
+            <a href="{{ url_for('tasks', month=task.Maand, plant=task.Plant) }}">
+              <strong>{{ task.Maand }}</strong>
+              <span>{{ task.Plant }}</span>
+              <small>{{ task.Actie }}</small>
+            </a>
+            <form method="post" action="{{ url_for('update_task_status', task_id=task.ID) }}">
+              <input type="hidden" name="status" value="{% if task.Status == 'Gereed' %}Open{% else %}Gereed{% endif %}">
+              <input type="hidden" name="next" value="{{ request.full_path }}">
+              <button type="submit" class="button-secondary compact-button">
+                {% if task.Status == "Gereed" %}Open{% else %}Gereed{% endif %}
+              </button>
+            </form>
+          </div>
+        {% endfor %}
+      </div>
+    </article>
   </section>
 
   <section class="panel upload-panel">
@@ -88,6 +211,13 @@
           <h2>Voorgestelde taken voor het hele jaar</h2>
           <span>{{ proposal_result.tasks|length }} taken</span>
         </div>
+        <div class="proposal-toolbar">
+          <p class="task-note">Alleen de aangevinkte taken worden opgeslagen.</p>
+          <div class="proposal-toolbar-actions">
+            <button type="button" class="button-secondary compact-button" data-proposal-toggle="all">Alles aanvinken</button>
+            <button type="button" class="button-secondary compact-button" data-proposal-toggle="none">Alles uitzetten</button>
+          </div>
+        </div>
         <div class="proposal-stack">
           {% for proposal in proposal_result.tasks %}
             <article class="proposal-card">
@@ -140,113 +270,26 @@
     (() => {
       const plantSelect = document.getElementById("selected_plant_name");
       const customPlantInput = document.getElementById("custom_plant_name");
-      if (!plantSelect || !customPlantInput) return;
+      if (plantSelect && customPlantInput) {
+        const syncCustomVisibility = () => {
+          const customMode = plantSelect.value === "__custom__";
+          customPlantInput.style.display = customMode ? "block" : "none";
+          customPlantInput.required = customMode;
+        };
 
-      const syncCustomVisibility = () => {
-        const customMode = plantSelect.value === "__custom__";
-        customPlantInput.style.display = customMode ? "block" : "none";
-        customPlantInput.required = customMode;
-      };
+        syncCustomVisibility();
+        plantSelect.addEventListener("change", syncCustomVisibility);
+      }
 
-      syncCustomVisibility();
-      plantSelect.addEventListener("change", syncCustomVisibility);
+      const proposalCheckboxes = Array.from(document.querySelectorAll('.proposal-toggle input[type="checkbox"]'));
+      document.querySelectorAll("[data-proposal-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          const shouldCheck = button.dataset.proposalToggle === "all";
+          proposalCheckboxes.forEach((checkbox) => {
+            checkbox.checked = shouldCheck;
+          });
+        });
+      });
     })();
   </script>
-
-  <section class="stat-grid">
-    <article class="stat-card">
-      <span>Totaal planten</span>
-      <strong>{{ total_plants }}</strong>
-    </article>
-    <article class="stat-card">
-      <span>Taken in {{ selected_month }}</span>
-      <strong>{{ month_summary.total if month_summary else 0 }}</strong>
-    </article>
-    <article class="stat-card">
-      <span>Open taken</span>
-      <strong>{{ month_summary.open if month_summary else 0 }}</strong>
-    </article>
-    <article class="stat-card">
-      <span>Hoge prioriteit</span>
-      <strong>{{ month_summary.high_priority if month_summary else 0 }}</strong>
-    </article>
-  </section>
-
-  <section class="dashboard-grid">
-    <article class="panel">
-      <div class="panel-head">
-        <h2>Wat er speelt in {{ selected_month }}</h2>
-        <a href="{{ url_for('tasks', month=selected_month) }}">Bekijk alles</a>
-      </div>
-      <div class="task-list">
-        {% for task in tasks %}
-          <div class="task-item status-{{ task.Status|lower }}">
-            <div>
-              <p class="task-title">{{ task.Plant }}</p>
-              <p class="task-meta">Week {{ task.Week }} • {{ task.Categorie }} • {{ task.Duur }}</p>
-            </div>
-            <div>
-              <span class="badge priority-{{ task.Prioriteit|lower }}">{{ task.Prioriteit }}</span>
-              <span class="badge neutral">{{ task.Status }}</span>
-            </div>
-            <p class="task-action">{{ task.Actie }}</p>
-            {% if task.Opmerking %}
-              <p class="task-note">{{ task.Opmerking }}</p>
-            {% endif %}
-          </div>
-        {% else %}
-          <p class="empty-state">Voor deze maand staan er nog geen taken gepland.</p>
-        {% endfor %}
-      </div>
-    </article>
-
-    <article class="panel">
-      <div class="panel-head">
-        <h2>Overzicht per plant</h2>
-        <a href="{{ url_for('plants') }}">Alle planten</a>
-      </div>
-      <div class="workload-list">
-        {% for item in workload %}
-          <a class="workload-row" href="{{ url_for('plant_detail', plant_name=item.plant) }}">
-            <span>{{ item.plant }}</span>
-            <span>{{ item.tasks }} taken</span>
-            <span>{{ item.open }} open</span>
-            <span>{{ item.high }} hoog</span>
-          </a>
-        {% else %}
-          <p class="empty-state">Nog geen plantoverzicht beschikbaar.</p>
-        {% endfor %}
-      </div>
-    </article>
-  </section>
-
-  <section class="dashboard-grid secondary">
-    <article class="panel">
-      <div class="panel-head">
-        <h2>Verdeling van de taken</h2>
-      </div>
-      <div class="chip-cloud">
-        {% if month_summary %}
-          {% for category, count in month_summary.categories.items() %}
-            <span class="chip">{{ category }} <strong>{{ count }}</strong></span>
-          {% endfor %}
-        {% endif %}
-      </div>
-    </article>
-
-    <article class="panel">
-      <div class="panel-head">
-        <h2>Wat komt hierna</h2>
-      </div>
-      <div class="mini-list">
-        {% for task in next_up %}
-          <a class="mini-item" href="{{ url_for('tasks', month=task.Maand, plant=task.Plant) }}">
-            <strong>{{ task.Maand }}</strong>
-            <span>{{ task.Plant }}</span>
-            <small>{{ task.Actie }}</small>
-          </a>
-        {% endfor %}
-      </div>
-    </article>
-  </section>
 {% endblock %}

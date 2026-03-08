@@ -121,6 +121,10 @@ class BaseStore(ABC):
     def update_task(self, task_id: str, values: dict[str, str]) -> dict[str, str]:
         raise NotImplementedError
 
+    @abstractmethod
+    def update_task_status(self, task_id: str, status: str) -> dict[str, str]:
+        raise NotImplementedError
+
 
 class FileStore(BaseStore):
     def __init__(self, path: Path) -> None:
@@ -230,6 +234,15 @@ class FileStore(BaseStore):
         payload = self._read()
         task = next((item for item in payload["tasks"] if item["ID"] == task_id), None)
         task.update(_default_task_record(values, plant["id"]))
+        self._write(payload)
+        return task
+
+    def update_task_status(self, task_id: str, status: str) -> dict[str, str]:
+        payload = self._read()
+        task = next((item for item in payload["tasks"] if item["ID"] == task_id), None)
+        if task is None:
+            raise ValueError(f"Taak niet gevonden: {task_id}")
+        task["Status"] = status
         self._write(payload)
         return task
 
@@ -350,6 +363,14 @@ class FirestoreStore(BaseStore):
             raise ValueError(f"Taak niet gevonden: {task_id}")
         plant = self.ensure_plant(values["Plant"])
         task = _default_task_record(values, plant["id"])
+        self.tasks_collection.document(task_id).set(task)
+        return task
+
+    def update_task_status(self, task_id: str, status: str) -> dict[str, str]:
+        task = self.get_task(task_id)
+        if task is None:
+            raise ValueError(f"Taak niet gevonden: {task_id}")
+        task["Status"] = status
         self.tasks_collection.document(task_id).set(task)
         return task
 

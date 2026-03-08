@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import re
 import secrets
+from math import ceil
 
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
@@ -39,6 +40,10 @@ PLANT_FIELDS = ["Plant", "Type", "Snoeigroep", "Standplaats", "Winterhard", "Not
 
 def _current_month_name() -> str:
     return MONTHS[datetime.now().month - 1]
+
+
+def _current_week_of_month() -> str:
+    return str(min(5, ceil(datetime.now().day / 7)))
 
 
 def _backend_name() -> str:
@@ -121,6 +126,30 @@ def _monthly_summary(tasks: list[dict[str, str]]) -> list[dict[str, object]]:
             }
         )
     return summary
+
+
+def _estimate_minutes(duration: str) -> int:
+    text = str(duration or "").strip().lower()
+    if not text:
+        return 0
+    values = [int(match) for match in re.findall(r"\d+", text)]
+    if not values:
+        return 0
+    number = sum(values) // len(values)
+    if "uur" in text or "hour" in text:
+        return number * 60
+    return number
+
+
+def _format_minutes(total_minutes: int) -> str:
+    if total_minutes <= 0:
+        return "Nog niet ingeschat"
+    hours, minutes = divmod(total_minutes, 60)
+    if hours and minutes:
+        return f"{hours} u {minutes} min"
+    if hours:
+        return f"{hours} uur"
+    return f"{minutes} min"
 
 
 def _yearly_heatmap(plants: list[dict[str, object]], tasks: list[dict[str, str]]) -> list[dict[str, object]]:
@@ -218,10 +247,13 @@ def create_app() -> Flask:
         selected_month = request.args.get("month") or _current_month_name()
         if selected_month not in MONTHS:
             selected_month = _current_month_name()
+        selected_week = request.args.get("week") or _current_week_of_month()
+        if selected_week not in {"1", "2", "3", "4", "5"}:
+            selected_week = _current_week_of_month()
 
-        month_tasks = [task for task in tasks if task["Maand"] == selected_month]
-        month_tasks = sorted(
-            month_tasks,
+        week_tasks = [task for task in tasks if task["Maand"] == selected_month and str(task["Week"]) == selected_week]
+        week_tasks = sorted(
+            week_tasks,
             key=lambda task: (
                 PRIORITY_ORDER.get(task["Prioriteit"], 99),
                 STATUS_ORDER.get(task["Status"], 99),
@@ -229,10 +261,12 @@ def create_app() -> Flask:
                 task["Plant"],
             ),
         )
+        open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
+        week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
 
         workload = []
         for item in _plant_workload(plants, tasks):
-            matching = [task for task in month_tasks if task["Plant"] == item["plant"]]
+            matching = [task for task in week_tasks if task["Plant"] == item["plant"]]
             if matching:
                 workload.append(
                     {
@@ -250,8 +284,12 @@ def create_app() -> Flask:
             "dashboard.html",
             page_title="Dashboard",
             selected_month=selected_month,
+            selected_week=selected_week,
             months=MONTHS,
-            tasks=month_tasks,
+            weeks=["1", "2", "3", "4", "5"],
+            tasks=week_tasks,
+            open_week_tasks=len(open_week_tasks),
+            week_time_budget=_format_minutes(week_minutes),
             workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
             month_summary=month_summary,
             next_up=_next_up(tasks),
@@ -306,12 +344,15 @@ def create_app() -> Flask:
         selected_month = request.args.get("month") or _current_month_name()
         if selected_month not in MONTHS:
             selected_month = _current_month_name()
-        month_tasks = [task for task in all_tasks if task["Maand"] == selected_month]
+        selected_week = request.args.get("week") or _current_week_of_month()
+        if selected_week not in {"1", "2", "3", "4", "5"}:
+            selected_week = _current_week_of_month()
+        week_tasks = [task for task in all_tasks if task["Maand"] == selected_month and str(task["Week"]) == selected_week]
         summary = _monthly_summary(all_tasks)
         month_summary = next(entry for entry in summary if entry["month"] == selected_month)
         workload = []
         for item in _plant_workload(plants, all_tasks):
-            matching = [task for task in month_tasks if task["Plant"] == item["plant"]]
+            matching = [task for task in week_tasks if task["Plant"] == item["plant"]]
             if matching:
                 workload.append(
                     {
@@ -358,14 +399,18 @@ def create_app() -> Flask:
             for item in analysis_result.get("year_round_maintenance", [])
             if str(item).strip()
         ]
+        open_week_tasks = [task for task in week_tasks if task["Status"] != "Gereed"]
+        week_minutes = sum(_estimate_minutes(task.get("Duur", "")) for task in open_week_tasks)
 
         return render_template(
             "dashboard.html",
             page_title="Dashboard",
             selected_month=selected_month,
+            selected_week=selected_week,
             months=MONTHS,
+            weeks=["1", "2", "3", "4", "5"],
             tasks=sorted(
-                month_tasks,
+                week_tasks,
                 key=lambda task: (
                     PRIORITY_ORDER.get(task["Prioriteit"], 99),
                     STATUS_ORDER.get(task["Status"], 99),
@@ -373,6 +418,8 @@ def create_app() -> Flask:
                     task["Plant"],
                 ),
             ),
+            open_week_tasks=len(open_week_tasks),
+            week_time_budget=_format_minutes(week_minutes),
             workload=sorted(workload, key=lambda item: (-item["open"], -item["high"], item["plant"])),
             month_summary=month_summary,
             next_up=_next_up(all_tasks),
@@ -551,6 +598,13 @@ def create_app() -> Flask:
             types=reference["plant_types"],
             hardiness_options=reference["hardiness_options"],
             filters={"q": request.args.get("q", "").strip(), "type": selected_type, "winterhard": selected_hardiness},
+        )
+
+    @app.get("/plants/new")
+    def new_plant():
+        return render_template(
+            "new_plant.html",
+            page_title="Plant toevoegen",
             new_plant={
                 "Plant": "",
                 "Type": "",
@@ -651,6 +705,26 @@ def create_app() -> Flask:
             message += f" {removed_tasks} gekoppelde taken zijn ook verwijderd."
         flash(message, "success")
         return redirect(url_for("plants"))
+
+    @app.post("/task/<task_id>/status")
+    def update_task_status(task_id: str):
+        next_url = request.form.get("next", "").strip() or request.referrer or url_for("tasks")
+        status = request.form.get("status", "").strip()
+        if status not in {"Open", "Uitgesteld", "Gereed"}:
+            flash("Onbekende taakstatus.", "error")
+            return redirect(next_url)
+
+        try:
+            task = STORE.update_task_status(task_id, status)
+        except ValueError as exc:
+            flash(str(exc), "error")
+            return redirect(next_url)
+
+        if status == "Gereed":
+            flash(f"{task['Plant']} is afgevinkt.", "success")
+        else:
+            flash(f"{task['Plant']} staat weer op {status.lower()}.", "success")
+        return redirect(next_url)
 
     @app.route("/task/<task_id>", methods=["GET", "POST"])
     def task_detail(task_id: str):

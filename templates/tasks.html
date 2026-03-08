@@ -101,7 +101,7 @@
             <th>Status</th>
             <th>Duur</th>
             <th>Opmerking</th>
-            <th></th>
+            <th>Acties</th>
           </tr>
         </thead>
         <tbody>
@@ -117,7 +117,18 @@
               <td><span class="badge neutral">{{ task.Status }}</span></td>
               <td>{{ task.Duur }}</td>
               <td>{{ task.Opmerking }}</td>
-              <td><a class="table-link" href="{{ url_for('task_detail', task_id=task.ID) }}">Openen</a></td>
+              <td>
+                <div class="table-actions">
+                  <form method="post" action="{{ url_for('update_task_status', task_id=task.ID) }}">
+                    <input type="hidden" name="status" value="{% if task.Status == 'Gereed' %}Open{% else %}Gereed{% endif %}">
+                    <input type="hidden" name="next" value="{{ request.full_path }}">
+                    <button type="submit" class="button-secondary compact-button">
+                      {% if task.Status == "Gereed" %}Open{% else %}Gereed{% endif %}
+                    </button>
+                  </form>
+                  <a class="table-link" href="{{ url_for('task_detail', task_id=task.ID) }}">Openen</a>
+                </div>
+              </td>
             </tr>
           {% else %}
             <tr>

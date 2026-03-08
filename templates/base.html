@@ -22,7 +22,8 @@
         <nav class="nav">
           <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">Dashboard</a>
           <a href="{{ url_for('tasks') }}" class="{% if request.endpoint == 'tasks' %}active{% endif %}">Taken</a>
-          <a href="{{ url_for('plants') }}" class="{% if request.endpoint == 'plants' %}active{% endif %}">Planten</a>
+          <a href="{{ url_for('plants') }}" class="{% if request.endpoint in ['plants', 'plant_detail'] %}active{% endif %}">Planten</a>
+          <a href="{{ url_for('new_plant') }}" class="{% if request.endpoint == 'new_plant' %}active{% endif %}">Nieuwe plant</a>
           <a href="{{ url_for('calendar') }}" class="{% if request.endpoint == 'calendar' %}active{% endif %}">Jaarplanner</a>
         </nav>
       </header>
@@ -38,18 +39,21 @@
         {% endwith %}
         {% block content %}{% endblock %}
       </main>
-      <nav class="mobile-tabbar" aria-label="Mobiele navigatie">
+      <nav class="mobile-tabbar mobile-tabbar-five" aria-label="Mobiele navigatie">
         <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
           <span>Dashboard</span>
         </a>
         <a href="{{ url_for('tasks') }}" class="{% if request.endpoint == 'tasks' %}active{% endif %}">
           <span>Taken</span>
         </a>
-        <a href="{{ url_for('plants') }}" class="{% if request.endpoint == 'plants' %}active{% endif %}">
+        <a href="{{ url_for('plants') }}" class="{% if request.endpoint in ['plants', 'plant_detail'] %}active{% endif %}">
           <span>Planten</span>
         </a>
+        <a href="{{ url_for('new_plant') }}" class="{% if request.endpoint == 'new_plant' %}active{% endif %}">
+          <span>Nieuw</span>
+        </a>
         <a href="{{ url_for('calendar') }}" class="{% if request.endpoint == 'calendar' %}active{% endif %}">
-          <span>Jaarplanner</span>
+          <span>Jaar</span>
         </a>
       </nav>
     </div>

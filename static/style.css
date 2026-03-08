@@ -184,6 +184,16 @@ h2 {
   flex-direction: column;
 }
 
+.week-picker {
+  min-width: 320px;
+}
+
+.period-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .month-picker select {
   min-width: 0;
 }
@@ -221,12 +231,21 @@ button {
   cursor: pointer;
 }
 
+.button-secondary {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.78);
+}
+
 .button-danger {
   background: linear-gradient(135deg, #9a3f3f, #c45c49);
 }
 
 .button-link.subtle {
   color: var(--muted);
+}
+
+.button-link.subtle:hover {
+  color: var(--text);
 }
 
 .stat-grid,
@@ -252,6 +271,34 @@ button {
   display: flex;
   justify-content: flex-end;
   margin-top: 18px;
+}
+
+.filter-panel {
+  margin-bottom: 18px;
+}
+
+.filters-plants {
+  align-items: stretch;
+}
+
+.filters-plants > * {
+  flex: 1 1 220px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.results-count {
+  padding: 8px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(32, 49, 39, 0.08);
 }
 
 .stat-grid {
@@ -314,6 +361,32 @@ button {
   gap: 12px;
 }
 
+.planner-hint {
+  margin-bottom: 14px;
+  color: var(--muted);
+}
+
+.planner-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(300px, 360px);
+  gap: 18px;
+  overflow-x: auto;
+  padding-bottom: 10px;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.planner-strip::-webkit-scrollbar {
+  height: 10px;
+}
+
+.planner-strip::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(32, 49, 39, 0.16);
+}
+
 .workload-row {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   display: grid;
@@ -343,6 +416,24 @@ button {
 
 .task-action {
   margin-bottom: 0;
+}
+
+.task-actions,
+.table-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.task-actions form,
+.table-actions form {
+  margin: 0;
+}
+
+.compact-button {
+  padding: 10px 14px;
+  min-height: auto;
 }
 
 .badge,
@@ -387,29 +478,38 @@ button {
 }
 
 .plant-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   padding: 22px;
   border-radius: var(--radius);
 }
 
-.plant-card dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0 0 16px;
+.plant-card h2 {
+  margin-bottom: 0;
 }
 
-.plant-card dt,
-.plant-card dd {
-  margin: 0;
+.plant-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-.planner-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.plant-facts .chip {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.plant-summary {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .month-card {
+  min-height: 100%;
   padding: 18px;
   border-radius: 22px;
+  scroll-snap-align: start;
 }
 
 .month-card h2 {
@@ -419,6 +519,24 @@ button {
 .week-block ul {
   margin: 8px 0 0;
   padding-left: 18px;
+}
+
+.calendar-task-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.calendar-task-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.calendar-task-row form {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .table-wrap {
@@ -472,6 +590,24 @@ td {
   gap: 16px;
 }
 
+.proposal-toolbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.proposal-toolbar .task-note {
+  margin-bottom: 0;
+}
+
+.proposal-toolbar-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .proposal-card {
   padding: 18px;
   border-radius: 22px;
@@ -495,12 +631,18 @@ td {
   gap: 10px;
   margin-bottom: 14px;
   font-weight: 700;
+  cursor: pointer;
 }
 
 .proposal-toggle input {
-  width: 18px;
-  height: 18px;
+  appearance: auto;
+  width: 20px;
+  height: 20px;
   padding: 0;
+  margin: 0;
+  accent-color: var(--accent);
+  background: transparent;
+  border: 0;
 }
 
 .proposal-meta {
@@ -594,6 +736,19 @@ td {
   .workload-row {
     grid-template-columns: 1.4fr 1fr 1fr 1fr;
   }
+
+  .planner-strip {
+    grid-auto-columns: minmax(280px, 320px);
+  }
+
+  .filter-actions {
+    justify-content: stretch;
+  }
+
+  .filter-actions > * {
+    flex: 1 1 auto;
+    text-align: center;
+  }
 }
 
 @media (max-width: 640px) {
@@ -640,8 +795,7 @@ td {
     display: none;
   }
 
-  .stat-grid,
-  .plant-card dl {
+  .stat-grid {
     grid-template-columns: 1fr;
   }
 
@@ -690,6 +844,19 @@ td {
     min-width: 0;
   }
 
+  .week-picker {
+    min-width: 0;
+  }
+
+  .period-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .planner-strip {
+    grid-auto-columns: 86vw;
+    gap: 14px;
+  }
+
   .stat-card {
     padding: 16px 18px;
   }
@@ -713,6 +880,13 @@ td {
     justify-items: start;
   }
 
+  .task-actions,
+  .table-actions,
+  .calendar-task-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .panel-head,
   .plant-card-head,
   .month-card-head {
@@ -729,6 +903,10 @@ td {
   .button-link,
   button {
     width: 100%;
+  }
+
+  .filter-actions {
+    flex-direction: column;
   }
 
   select,
@@ -749,6 +927,15 @@ td {
   .proposal-toggle {
     align-items: flex-start;
     line-height: 1.35;
+  }
+
+  .proposal-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .proposal-toolbar-actions {
+    flex-direction: column;
   }
 
   .flash-stack {
@@ -787,6 +974,10 @@ td {
     text-align: center;
     font-size: 0.88rem;
     line-height: 1.1;
+  }
+
+  .mobile-tabbar-five {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .mobile-tabbar a.active {

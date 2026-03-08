@@ -5,71 +5,59 @@
     <div>
       <p class="eyebrow">Plantenoverzicht</p>
       <h1>Alles wat je over je planten wilt terugvinden.</h1>
+      <p class="lede compact-lede">Zoek snel een plant, bekijk de belangrijkste info en open direct de detailpagina.</p>
     </div>
-    <a class="button-link" href="#new-plant">Plant toevoegen</a>
+    <a class="button-link" href="{{ url_for('new_plant') }}">Plant toevoegen</a>
   </section>
 
-  <section class="panel" id="new-plant">
+  <section class="panel filter-panel">
     <div class="panel-head">
-      <h2>Nieuwe plant bewaren</h2>
+      <div>
+        <h2>Snel zoeken</h2>
+        <p class="task-note">Filter op naam, type of winterhardheid.</p>
+      </div>
+      <span class="results-count">{{ plants|length }} planten</span>
     </div>
-    <form method="post" action="{{ url_for('create_plant') }}" class="editor-grid">
-      <input name="Plant" placeholder="Naam van de plant" value="{{ new_plant.Plant }}" required>
-      <input name="Type" placeholder="Soort of type" value="{{ new_plant.Type }}">
-      <input name="Snoeigroep" placeholder="Snoeigroep" value="{{ new_plant.Snoeigroep }}">
-      <input name="Standplaats" placeholder="Zon, halfschaduw, schaduw..." value="{{ new_plant.Standplaats }}">
-      <input name="Winterhard" placeholder="Bijvoorbeeld ja of nee" value="{{ new_plant.Winterhard }}">
-      <textarea name="Notitie" placeholder="Handige notitie over deze plant">{{ new_plant.Notitie }}</textarea>
-      <button type="submit">Bewaar plant</button>
+    <form method="get" class="filters filters-plants">
+      <input type="search" name="q" placeholder="Zoek op plantnaam of notitie" value="{{ filters.q }}">
+      <select name="type">
+        <option value="">Alle types</option>
+        {% for type in types %}
+          <option value="{{ type }}" {% if filters.type == type %}selected{% endif %}>{{ type }}</option>
+        {% endfor %}
+      </select>
+      <select name="winterhard">
+        <option value="">Alle winterhardheid</option>
+        {% for option in hardiness_options %}
+          <option value="{{ option }}" {% if filters.winterhard == option %}selected{% endif %}>{{ option }}</option>
+        {% endfor %}
+      </select>
+      <div class="filter-actions">
+        <button type="submit">Toon resultaat</button>
+        {% if filters.q or filters.type or filters.winterhard %}
+          <a class="button-link subtle" href="{{ url_for('plants') }}">Wis filters</a>
+        {% endif %}
+      </div>
     </form>
   </section>
-
-  <form method="get" class="filters">
-    <input type="search" name="q" placeholder="Zoek op plantnaam of notitie" value="{{ filters.q }}">
-    <select name="type">
-      <option value="">Alle types</option>
-      {% for type in types %}
-        <option value="{{ type }}" {% if filters.type == type %}selected{% endif %}>{{ type }}</option>
-      {% endfor %}
-    </select>
-    <select name="winterhard">
-      <option value="">Alle winterhardheid</option>
-      {% for option in hardiness_options %}
-        <option value="{{ option }}" {% if filters.winterhard == option %}selected{% endif %}>{{ option }}</option>
-      {% endfor %}
-    </select>
-    <button type="submit">Toon resultaat</button>
-  </form>
 
   <section class="card-grid">
     {% for plant in plants %}
       <article class="plant-card">
         <div class="plant-card-head">
           <div>
-            <p class="eyebrow">{{ plant.Type }}</p>
+            <p class="eyebrow">{{ plant.Type or "Plant" }}</p>
             <h2><a href="{{ url_for('plant_detail', plant_name=plant.Plant) }}">{{ plant.Plant }}</a></h2>
           </div>
           <span class="badge neutral">{{ plant.OpenTaken }} open</span>
         </div>
-        <dl>
-          <div>
-            <dt>Snoeigroep</dt>
-            <dd>{{ plant.Snoeigroep or "Onbekend" }}</dd>
-          </div>
-          <div>
-            <dt>Standplaats</dt>
-            <dd>{{ plant.Standplaats or "Onbekend" }}</dd>
-          </div>
-          <div>
-            <dt>Winterhard</dt>
-            <dd>{{ plant.Winterhard or "Onbekend" }}</dd>
-          </div>
-          <div>
-            <dt>Totaal taken</dt>
-            <dd>{{ plant.Taken }}</dd>
-          </div>
-        </dl>
-        <p>{{ plant.Notitie or "Nog geen extra notitie opgeslagen." }}</p>
+        <div class="plant-facts">
+          <span class="chip">Snoeigroep <strong>{{ plant.Snoeigroep or "Onbekend" }}</strong></span>
+          <span class="chip">Standplaats <strong>{{ plant.Standplaats or "Onbekend" }}</strong></span>
+          <span class="chip">Winterhard <strong>{{ plant.Winterhard or "Onbekend" }}</strong></span>
+          <span class="chip">Taken <strong>{{ plant.Taken }}</strong></span>
+        </div>
+        <p class="plant-summary">{{ plant.Notitie or "Nog geen extra notitie opgeslagen." }}</p>
         <div class="card-actions">
           <a class="button-link subtle" href="{{ url_for('plant_detail', plant_name=plant.Plant) }}">Open plant</a>
         </div>

@@ -9,7 +9,8 @@
   </section>
 
   <section class="panel">
-    <div class="planner-grid">
+    <div class="planner-hint">Swipe of scroll horizontaal door het jaar.</div>
+    <div class="planner-strip">
       {% for month in months %}
         <article class="month-card">
           <div class="month-card-head">
@@ -21,11 +22,20 @@
             {% for label, tasks in month.weeks %}
               <div class="week-block">
                 <strong>{{ label }}</strong>
-                <ul>
+                <div class="calendar-task-list">
                   {% for task in tasks[:4] %}
-                    <li>{{ task.Plant }}: {{ task.Actie }}</li>
+                    <div class="calendar-task-row">
+                      <span>{{ task.Plant }}: {{ task.Actie }}</span>
+                      <form method="post" action="{{ url_for('update_task_status', task_id=task.ID) }}">
+                        <input type="hidden" name="status" value="{% if task.Status == 'Gereed' %}Open{% else %}Gereed{% endif %}">
+                        <input type="hidden" name="next" value="{{ request.full_path }}">
+                        <button type="submit" class="button-secondary compact-button">
+                          {% if task.Status == "Gereed" %}Open{% else %}Gereed{% endif %}
+                        </button>
+                      </form>
+                    </div>
                   {% endfor %}
-                </ul>
+                </div>
               </div>
             {% endfor %}
           </div>
