@@ -21,20 +21,20 @@
     <div class="panel-head">
       <div>
         <p class="eyebrow">Slimme invoer</p>
-        <h2>Upload een foto en laat Gemini taken voorstellen</h2>
+        <h2>Typ een plant of laat de foto eerst helpen met herkenning</h2>
       </div>
     </div>
     <form method="post" action="{{ url_for('propose_tasks') }}" enctype="multipart/form-data" class="editor-grid">
-      <select name="plant_name" required>
-        <option value="">Kies een plant</option>
-        {% for plant in plants_for_upload %}
-          <option value="{{ plant }}" {% if proposal_result and proposal_result.plant_name == plant %}selected{% endif %}>{{ plant }}</option>
-        {% endfor %}
-      </select>
+      <input name="plant_name" list="plant-options" placeholder="Typ plantnaam of laat leeg voor fotoherkenning" value="{{ proposal_result.manual_plant if proposal_result else '' }}">
       <input type="file" name="plant_photo" accept="image/*" required>
       <button type="submit">Analyseer foto</button>
     </form>
-    <p class="task-note">Gebruik dit voor snelle suggesties. Je kunt elk voorstel nog aanpassen voordat je het opslaat.</p>
+    <datalist id="plant-options">
+      {% for plant in plants_for_upload %}
+        <option value="{{ plant }}"></option>
+      {% endfor %}
+    </datalist>
+    <p class="task-note">Optie 1: typ zelf de plant. Optie 2: laat het veld leeg en gebruik de foto voor herkenning. Daarna kies je welke taken en tips je wilt overnemen.</p>
   </section>
 
   {% if proposal_result %}
@@ -42,14 +42,45 @@
       <div class="panel-head">
         <div>
           <p class="eyebrow">Gemini voorstel</p>
-          <h2>Voorgestelde taken voor {{ proposal_result.plant_name }}</h2>
+          <h2>Analyse voor {{ proposal_result.plant_name }}</h2>
         </div>
+      </div>
+      <div class="analysis-summary">
+        <div class="chip-cloud">
+          <span class="chip">Gekozen plant <strong>{{ proposal_result.plant_name }}</strong></span>
+          {% if proposal_result.identification_confidence != "" %}
+            <span class="chip">Confidence <strong>{{ proposal_result.identification_confidence }}</strong></span>
+          {% endif %}
+        </div>
+        {% if proposal_result.plant_options %}
+          <p class="task-note">Mogelijke plantopties: {{ proposal_result.plant_options|unique|join(', ') }}</p>
+        {% endif %}
+        {% if proposal_result.identification_reason %}
+          <p class="task-note">{{ proposal_result.identification_reason }}</p>
+        {% endif %}
       </div>
       {% if proposal_result.summary %}
         <p class="lede compact-lede">{{ proposal_result.summary }}</p>
       {% endif %}
+      {% if proposal_result.direct_tips %}
+        <div class="tips-list">
+          {% for tip in proposal_result.direct_tips %}
+            <div class="tip-card">{{ tip }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
       <form method="post" action="{{ url_for('accept_proposals') }}">
         <input type="hidden" name="proposal-count" value="{{ proposal_result.tasks|length }}">
+        <div class="proposal-plant-picker">
+          <label for="selected_plant_name">Welke plant wil je voor deze taken gebruiken?</label>
+          <select id="selected_plant_name" name="selected_plant_name">
+            {% for plant in proposal_result.all_plant_options %}
+              <option value="{{ plant }}" {% if proposal_result.plant_name == plant %}selected{% endif %}>{{ plant }}</option>
+            {% endfor %}
+            <option value="__custom__">Andere plant...</option>
+          </select>
+          <input id="custom_plant_name" name="custom_plant_name" list="plant-options" placeholder="Typ een andere plantnaam" {% if proposal_result.plant_name not in proposal_result.all_plant_options %}value="{{ proposal_result.plant_name }}"{% endif %}>
+        </div>
         <div class="proposal-stack">
           {% for proposal in proposal_result.tasks %}
             <article class="proposal-card">
@@ -95,6 +126,23 @@
       </form>
     </section>
   {% endif %}
+
+  <script>
+    (() => {
+      const plantSelect = document.getElementById("selected_plant_name");
+      const customPlantInput = document.getElementById("custom_plant_name");
+      if (!plantSelect || !customPlantInput) return;
+
+      const syncCustomVisibility = () => {
+        const customMode = plantSelect.value === "__custom__";
+        customPlantInput.style.display = customMode ? "block" : "none";
+        customPlantInput.required = customMode;
+      };
+
+      syncCustomVisibility();
+      plantSelect.addEventListener("change", syncCustomVisibility);
+    })();
+  </script>
 
   <section class="stat-grid">
     <article class="stat-card">

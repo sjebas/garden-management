@@ -400,6 +400,22 @@ td {
   margin-bottom: 18px;
 }
 
+.analysis-summary {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.proposal-plant-picker {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(255, 255, 255, 0.68);
+}
+
 .proposal-stack {
   display: grid;
   gap: 16px;
@@ -441,6 +457,19 @@ td {
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 14px;
+}
+
+.tips-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.tip-card {
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(32, 49, 39, 0.08);
+  background: rgba(220, 233, 222, 0.68);
 }
 
 .flash-stack {

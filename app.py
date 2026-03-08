@@ -11,7 +11,7 @@ import secrets
 from flask import Flask, abort, flash, redirect, render_template, request, url_for
 
 from data_store import create_store, generate_task_id
-from gemini_helper import propose_tasks_from_image
+from gemini_helper import analyze_plant_image
 from garden_data import MONTHS, MONTH_INDEX, PRIORITY_ORDER, STATUS_ORDER, GardenWorkbook
 
 
@@ -164,8 +164,11 @@ def _next_up(tasks: list[dict[str, str]]) -> list[dict[str, str]]:
 
 
 def _proposal_form_values(form, index: int) -> dict[str, str]:
+    selected_plant = form.get("selected_plant_name", "").strip()
+    custom_plant = form.get("custom_plant_name", "").strip()
+    resolved_plant = custom_plant or selected_plant or form.get(f"proposal-{index}-Plant", "").strip()
     return {
-        "Plant": form.get(f"proposal-{index}-Plant", "").strip(),
+        "Plant": resolved_plant,
         "Maand": form.get(f"proposal-{index}-Maand", "").strip(),
         "Week": form.get(f"proposal-{index}-Week", "").strip(),
         "Categorie": form.get(f"proposal-{index}-Categorie", "").strip(),
@@ -247,9 +250,6 @@ def create_app() -> Flask:
         plant_name = request.form.get("plant_name", "").strip()
         image = request.files.get("plant_photo")
 
-        if not plant_name:
-            flash("Kies eerst een plant.", "error")
-            return redirect(url_for("dashboard"))
         if image is None or not image.filename:
             flash("Upload eerst een foto van de plant.", "error")
             return redirect(url_for("dashboard"))
@@ -269,13 +269,14 @@ def create_app() -> Flask:
         existing_tasks = [task for task in all_tasks if task["Plant"] == plant_name]
 
         try:
-            proposal_result = propose_tasks_from_image(
-                plant_name=plant_name,
+            analysis_result = analyze_plant_image(
+                selected_plant_name=plant_name,
                 image_bytes=image_bytes,
                 mime_type=mime_type,
                 current_month=_current_month_name(),
                 plant_profile=plant_profile,
                 existing_tasks=existing_tasks,
+                known_plants=reference["plants"],
                 allowed_months=reference["months"],
                 allowed_categories=reference["categories"],
                 allowed_priorities=reference["priorities"],
@@ -304,11 +305,16 @@ def create_app() -> Flask:
                     }
                 )
 
+        resolved_plant_name = (
+            plant_name
+            or str(analysis_result.get("identified_plant", "")).strip()
+            or "Onbekende plant"
+        )
         proposal_tasks = []
-        for item in proposal_result.get("tasks", []):
+        for item in analysis_result.get("tasks", []):
             proposal_tasks.append(
                 {
-                    "Plant": plant_name,
+                    "Plant": resolved_plant_name,
                     "Maand": str(item.get("month", "")).strip(),
                     "Week": str(item.get("week", "")).strip(),
                     "Categorie": str(item.get("category", "")).strip(),
@@ -341,9 +347,29 @@ def create_app() -> Flask:
             total_plants=len(plants),
             plants_for_upload=[plant["Plant"] for plant in plants],
             proposal_result={
-                "summary": proposal_result.get("summary", ""),
+                "summary": analysis_result.get("summary", ""),
                 "tasks": proposal_tasks,
-                "plant_name": plant_name,
+                "plant_name": resolved_plant_name,
+                "manual_plant": plant_name,
+                "plant_options": [
+                    option
+                    for option in [resolved_plant_name, *analysis_result.get("plant_options", [])]
+                    if option
+                ],
+                "identification_confidence": analysis_result.get("identification_confidence", ""),
+                "identification_reason": analysis_result.get("identification_reason", ""),
+                "direct_tips": [
+                    str(item).strip()
+                    for item in analysis_result.get("direct_tips", [])
+                    if str(item).strip()
+                ],
+                "all_plant_options": sorted(
+                    {
+                        option
+                        for option in [*reference["plants"], resolved_plant_name, *analysis_result.get("plant_options", [])]
+                        if str(option).strip()
+                    }
+                ),
             },
             proposal_reference=reference,
         )

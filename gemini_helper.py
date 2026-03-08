@@ -7,10 +7,15 @@ from google import genai
 from google.genai import types
 
 
-TASK_PROPOSAL_SCHEMA = {
+ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
+        "identified_plant": {"type": "string"},
+        "identification_confidence": {"type": "number"},
+        "identification_reason": {"type": "string"},
+        "plant_options": {"type": "array", "items": {"type": "string"}},
         "summary": {"type": "string"},
+        "direct_tips": {"type": "array", "items": {"type": "string"}},
         "tasks": {
             "type": "array",
             "items": {
@@ -40,7 +45,15 @@ TASK_PROPOSAL_SCHEMA = {
             },
         },
     },
-    "required": ["summary", "tasks"],
+    "required": [
+        "identified_plant",
+        "identification_confidence",
+        "identification_reason",
+        "plant_options",
+        "summary",
+        "direct_tips",
+        "tasks",
+    ],
 }
 
 
@@ -51,14 +64,15 @@ def gemini_client() -> genai.Client:
     return genai.Client(api_key=api_key)
 
 
-def propose_tasks_from_image(
+def analyze_plant_image(
     *,
-    plant_name: str,
+    selected_plant_name: str,
     image_bytes: bytes,
     mime_type: str,
     current_month: str,
     plant_profile: dict[str, object] | None,
     existing_tasks: list[dict[str, str]],
+    known_plants: list[str],
     allowed_months: list[str],
     allowed_categories: list[str],
     allowed_priorities: list[str],
@@ -67,6 +81,7 @@ def propose_tasks_from_image(
     client = gemini_client()
     image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
 
+    plant_context = selected_plant_name or "Niet vooraf gekozen"
     plant_lines = []
     if plant_profile:
         for key in ["Type", "Snoeigroep", "Standplaats", "Winterhard", "Notitie"]:
@@ -82,30 +97,34 @@ def propose_tasks_from_image(
         )
 
     prompt = f"""
-Je helpt in een Nederlandse tuinbeheer-app.
+Je helpt in een Nederlandse tuinbeheer-app voor particulieren.
 
-De gebruiker heeft plant "{plant_name}" gekozen en een actuele foto geüpload.
-Analyseer de staat van de plant op de foto en stel alleen concrete, nuttige tuintaken voor die logisch zijn voor deze plant.
+De gebruiker heeft mogelijk al een plant gekozen: "{plant_context}".
+Als dat veld leeg is, gebruik de foto om de plant zo goed mogelijk te herkennen.
+
+Jouw taken:
+1. Bepaal welke plant dit waarschijnlijk is.
+2. Geef 2 tot 4 directe onderhoudstips.
+3. Geef 2 tot 6 concrete onderhoudstaken die in een planning kunnen worden opgeslagen.
 
 Regels:
-- Geef 2 tot 6 voorgestelde taken.
 - Gebruik Nederlands.
-- Wees praktisch en kort.
+- Houd het praktisch en kort.
 - Gebruik alleen maanden uit deze lijst: {", ".join(allowed_months)}.
-- Gebruik alleen categorieen uit deze lijst: {", ".join(allowed_categories) or "Snoeien, Bemesten, Onderhoud, Beschermen, Controle"}.
+- Gebruik alleen categorieen uit deze lijst: {", ".join(allowed_categories) or "Snoeien, Bemesten, Onderhoud, Beschermen, Controle, Water geven"}.
 - Gebruik alleen prioriteiten uit deze lijst: {", ".join(allowed_priorities)}.
 - Gebruik bij voorkeur een duur uit deze lijst: {", ".join(allowed_durations) or "5 min, 10 min, 15 min, 30 min, 1 uur"}.
+- "plant_options" moet 1 tot 5 mogelijke plantnamen bevatten.
+- Gebruik waar mogelijk plantnamen uit deze bestaande plantenlijst: {", ".join(known_plants[:120])}.
+- "identified_plant" moet de beste keuze zijn uit "plant_options".
 - Gebruik de huidige maand "{current_month}" tenzij een andere maand duidelijk logischer is.
-- Als iets onzeker is op basis van alleen de foto, benoem dat in de reden of notitie.
-- Geen algemene uitleg buiten het JSON antwoord.
+- Geef alleen JSON terug volgens het schema.
 
-Plantprofiel:
+Plantprofiel van eventueel gekozen plant:
 {chr(10).join(plant_lines) if plant_lines else "- Geen extra profielinformatie beschikbaar"}
 
-Bestaande voorbeeldtaken voor deze plant:
+Bestaande voorbeeldtaken:
 {chr(10).join(examples) if examples else "- Nog geen bestaande taken voor deze plant"}
-
-Geef JSON terug volgens het schema.
 """.strip()
 
     response = client.models.generate_content(
@@ -113,7 +132,7 @@ Geef JSON terug volgens het schema.
         contents=[prompt, image_part],
         config={
             "response_mime_type": "application/json",
-            "response_schema": TASK_PROPOSAL_SCHEMA,
+            "response_schema": ANALYSIS_SCHEMA,
             "temperature": 0.3,
         },
     )
