@@ -1,5 +1,5 @@
 substitutions:
-  _SERVICE_NAME: garden-flow
+  _SERVICE_NAME: garden-manager
   _REGION: europe-west1
   _REPOSITORY: garden-flow
   _IMAGE_NAME: garden-flow
@@ -33,6 +33,8 @@ steps:
       - ${_REGION}
       - --platform
       - managed
+      - --ingress
+      - all
       - --allow-unauthenticated
       - --min-instances
       - ${_MIN_INSTANCES}

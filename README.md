@@ -55,6 +55,20 @@ Belangrijk:
 - Voor Cloud Run gebruikt de deploy `GARDEN_DATA_BACKEND=firestore`.
 - Je moet in Google Cloud eerst Firestore in Native mode activeren in hetzelfde project.
 - De app gebruikt standaard de collecties `${prefix}_plants` en `${prefix}_tasks`, waarbij `prefix` uit `FIRESTORE_COLLECTION_PREFIX` komt.
+- De Cloud Build deploy target is `garden-manager` in `europe-west1` en forceert `ingress=all`, `allow-unauthenticated` en de runtime service account.
+
+## Cloud Run trigger
+
+Als je repo via Google Cloud is gekoppeld, controleer dan dat de trigger echt [cloudbuild.yaml](/Users/sebas/Documents/garden-management/cloudbuild.yaml) gebruikt.
+
+Als de trigger de standaard "source deploy" flow gebruikt in plaats van dit bestand, dan kunnen instellingen zoals:
+
+- service name
+- ingress
+- service account
+- environment variables
+
+weer overschreven worden.
 
 Voor lokaal ontwikkelen zonder Firestore:
 
