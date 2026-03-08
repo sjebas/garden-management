@@ -343,6 +343,15 @@ def create_app() -> Flask:
                     "Reason": str(item.get("reason", "")).strip(),
                 }
             )
+        proposal_tasks = sorted(
+            proposal_tasks,
+            key=lambda task: (
+                MONTH_INDEX.get(task["Maand"], 99),
+                int(task["Week"]) if str(task["Week"]).isdigit() else 99,
+                PRIORITY_ORDER.get(task["Prioriteit"], 99),
+                task["Actie"],
+            ),
+        )
 
         year_round_maintenance = [
             str(item).strip()

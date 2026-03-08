@@ -104,12 +104,13 @@ Als dat veld leeg is, gebruik de foto om de plant zo goed mogelijk te herkennen.
 
 Jouw taken:
 1. Bepaal welke plant dit waarschijnlijk is.
-2. Geef een compleet jaar-rond onderhoudsoverzicht voor deze plant.
-3. Geef alleen de concrete onderhoudstaken die echt nodig of zinvol zijn op basis van de plant en de huidige foto/toestand.
+2. Geef een korte, geruststellende samenvatting van deze plant en de huidige toestand.
+3. Geef een compact jaar-rond onderhoudsoverzicht in korte bullets.
+4. Geef een volledig jaarplan met concrete onderhoudstaken die de gebruiker meteen kan opslaan.
 
 Regels:
 - Gebruik Nederlands.
-- Houd het praktisch en kort.
+- Houd het praktisch, duidelijk en compact.
 - Gebruik alleen maanden uit deze lijst: {", ".join(allowed_months)}.
 - Gebruik alleen categorieen uit deze lijst: {", ".join(allowed_categories) or "Snoeien, Bemesten, Onderhoud, Beschermen, Controle, Water geven"}.
 - Gebruik alleen prioriteiten uit deze lijst: {", ".join(allowed_priorities)}.
@@ -118,13 +119,16 @@ Regels:
 - "plant_options" moet 1 tot 5 mogelijke plantnamen bevatten.
 - Gebruik waar mogelijk plantnamen uit deze bestaande plantenlijst: {", ".join(known_plants[:120])}.
 - "identified_plant" moet de beste keuze zijn uit "plant_options".
-- Gebruik de huidige maand "{current_month}" tenzij een andere maand duidelijk logischer is.
-- "year_round_maintenance" moet vollediger zijn dan de takenlijst en belangrijke terugkerende aandachtspunten benoemen voor het hele jaar.
+- "summary" moet maximaal 2 of 3 korte zinnen zijn.
+- "year_round_maintenance" moet uit 3 tot 6 korte bullets bestaan, geen lange alinea's, en alleen de belangrijkste aandachtspunten noemen.
 - Noem in "year_round_maintenance" expliciet seizoensgebonden zorg zoals snoeien, water geven, bemesten, standplaats, winterbescherming, ziekten/plagen en bijzonderheden voor deze plant als die relevant zijn.
-- Zorg dat geen belangrijke onderhoudspunten ontbreken als ze normaal gezien essentieel zijn voor deze plant.
-- Het aantal items in "tasks" is variabel: geef weinig taken als weinig nodig is en meer taken als de plant daar echt om vraagt.
-- Voeg geen opvultaak toe alleen om een minimum aantal te halen.
-- De concrete "tasks" moeten passen bij de huidige foto, huidige situatie en de onderhoudsbehoefte van juist deze plant; de jaar-rond tips mogen breder zijn.
+- De concrete "tasks" moeten het echte jaarplan vormen. Zet daarin de onderhoudsmomenten verspreid over het jaar, niet alleen wat nu in "{current_month}" speelt.
+- Voeg voor alle relevante onderhoudsperiodes taken toe als die normaal gezien belangrijk zijn voor deze plant. Denk aan bloei, nazorg, delen/verplanten, bemesten, water geven, controle, snoeien, beschermen en planten van bollen/knollen als dat van toepassing is.
+- Zorg dat de combinatie van "tasks" samen een bruikbaar jaarplan oplevert. Voor veel tuinplanten zullen dat vaak 4 tot 12 taken zijn, maar gebruik minder of meer als de plant dat echt vraagt.
+- Voeg geen opvultaak toe alleen om een aantal te halen.
+- Iedere taak moet concreet, uitvoerbaar en los opslaanbaar zijn.
+- Vermijd dubbele taken die hetzelfde moment en dezelfde handeling beschrijven.
+- Gebruik de huidige foto en de huidige situatie als extra context, maar laat belangrijke onderhoudsmomenten later in het jaar niet weg.
 - Geef alleen JSON terug volgens het schema.
 
 Plantprofiel van eventueel gekozen plant:

@@ -42,7 +42,7 @@
       <div class="panel-head">
         <div>
           <p class="eyebrow">Gemini voorstel</p>
-          <h2>Zorgadvies voor {{ proposal_result.plant_name }}</h2>
+          <h2>Jaarplan voor {{ proposal_result.plant_name }}</h2>
         </div>
       </div>
       <div class="analysis-summary">
@@ -63,6 +63,9 @@
         <p class="lede compact-lede">{{ proposal_result.summary }}</p>
       {% endif %}
       {% if proposal_result.year_round_maintenance %}
+        <div class="panel-head compact-head">
+          <h2>Korte onderhoudslijn</h2>
+        </div>
         <div class="tips-list">
           {% for tip in proposal_result.year_round_maintenance %}
             <div class="tip-card">{{ tip }}</div>
@@ -80,6 +83,10 @@
             <option value="__custom__">Andere plant...</option>
           </select>
           <input id="custom_plant_name" name="custom_plant_name" list="plant-options" placeholder="Typ hier een andere plantnaam" {% if proposal_result.plant_name not in proposal_result.all_plant_options %}value="{{ proposal_result.plant_name }}"{% endif %}>
+        </div>
+        <div class="panel-head compact-head">
+          <h2>Voorgestelde taken voor het hele jaar</h2>
+          <span>{{ proposal_result.tasks|length }} taken</span>
         </div>
         <div class="proposal-stack">
           {% for proposal in proposal_result.tasks %}
@@ -115,6 +122,8 @@
                 <span class="chip">{{ proposal.Reason }}</span>
               </div>
             </article>
+          {% else %}
+            <p class="empty-state">Er zijn nog geen opslaanbare taken voorgesteld.</p>
           {% endfor %}
         </div>
         <datalist id="proposal-duration-options">
