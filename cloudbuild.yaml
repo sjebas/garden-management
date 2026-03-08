@@ -8,6 +8,7 @@ substitutions:
   _IMAGE_NAME: garden-manager
   _FIRESTORE_COLLECTION_PREFIX: garden
   _RUNTIME_SERVICE_ACCOUNT: garden-flow-runner@garden-management-489611.iam.gserviceaccount.com
+  _GEMINI_SECRET_NAME: gemini-api-key
   _MAX_INSTANCES: "4"
   _MIN_INSTANCES: "0"
 
@@ -47,6 +48,8 @@ steps:
       - ${_RUNTIME_SERVICE_ACCOUNT}
       - --set-env-vars
       - GARDEN_DATA_BACKEND=firestore,FIRESTORE_PROJECT_ID=$PROJECT_ID,FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX}
+      - --update-secrets
+      - GEMINI_API_KEY=${_GEMINI_SECRET_NAME}:latest
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA

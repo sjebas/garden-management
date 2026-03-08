@@ -58,6 +58,7 @@ Belangrijk:
 - De app gebruikt standaard de collecties `${prefix}_plants` en `${prefix}_tasks`, waarbij `prefix` uit `FIRESTORE_COLLECTION_PREFIX` komt.
 - De Cloud Build deploy target is `garden-manager` in `europe-west1` en forceert `ingress=all`, `allow-unauthenticated` en de runtime service account.
 - Voor de foto-assistent moet `GEMINI_API_KEY` als environment variable beschikbaar zijn.
+- In productie wordt `GEMINI_API_KEY` via Secret Manager gekoppeld met secretnaam `gemini-api-key`.
 
 ## Cloud Run trigger
 
