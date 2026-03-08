@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="section-heading">
+    <div>
+      <p class="eyebrow">Jaarplanner</p>
+      <h1>Werkritme door het hele tuinjaar.</h1>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="planner-grid">
+      {% for month in months %}
+        <article class="month-card">
+          <div class="month-card-head">
+            <h2>{{ month.summary.month }}</h2>
+            <span>{{ month.summary.total }} taken</span>
+          </div>
+          <p class="month-meta">{{ month.summary.open }} open • {{ month.summary.high_priority }} hoog</p>
+          <div class="week-stack">
+            {% for label, tasks in month.weeks %}
+              <div class="week-block">
+                <strong>{{ label }}</strong>
+                <ul>
+                  {% for task in tasks[:4] %}
+                    <li>{{ task.Plant }}: {{ task.Actie }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Jaaroverzicht per plant</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Plant</th>
+            {% for month_name in month_index.keys() %}
+              <th>{{ month_name[:3] }}</th>
+            {% endfor %}
+            <th>Totaal</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in yearly_heatmap %}
+            <tr>
+              <td><a href="{{ url_for('plant_detail', plant_name=row.plant) }}">{{ row.plant }}</a></td>
+              {% for month_name in month_index.keys() %}
+                <td>{{ row.months[month_name] }}</td>
+              {% endfor %}
+              <td>{{ row.total }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endblock %}

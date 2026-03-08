@@ -1,0 +1,47 @@
+substitutions:
+  _SERVICE_NAME: garden-flow
+  _REGION: europe-west1
+  _REPOSITORY: garden-flow
+  _IMAGE_NAME: garden-flow
+  _FIRESTORE_COLLECTION_PREFIX: garden
+  _RUNTIME_SERVICE_ACCOUNT: garden-flow-runner@$PROJECT_ID.iam.gserviceaccount.com
+  _MAX_INSTANCES: "4"
+  _MIN_INSTANCES: "0"
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+      - .
+
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE_NAME}
+      - --image
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --allow-unauthenticated
+      - --min-instances
+      - ${_MIN_INSTANCES}
+      - --max-instances
+      - ${_MAX_INSTANCES}
+      - --service-account
+      - ${_RUNTIME_SERVICE_ACCOUNT}
+      - --set-env-vars
+      - GARDEN_DATA_BACKEND=firestore,FIRESTORE_PROJECT_ID=$PROJECT_ID,FIRESTORE_COLLECTION_PREFIX=${_FIRESTORE_COLLECTION_PREFIX}
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_IMAGE_NAME}:$COMMIT_SHA

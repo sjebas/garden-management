@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero">
+    <div>
+      <p class="eyebrow">Seizoensoverzicht</p>
+      <h1>Een rustige plek voor alle tuinklussen.</h1>
+      <p class="lede">De app leest rechtstreeks uit het Excelbestand en maakt er een bruikbaar dashboard van met maandtaken, plantdrukte en een jaarbeeld.</p>
+    </div>
+    <form method="get" class="month-picker">
+      <label for="month">Gekozen maand</label>
+      <select id="month" name="month" onchange="this.form.submit()">
+        {% for month in months %}
+          <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }}</option>
+        {% endfor %}
+      </select>
+    </form>
+  </section>
+
+  <section class="stat-grid">
+    <article class="stat-card">
+      <span>Totaal planten</span>
+      <strong>{{ total_plants }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Taken in {{ selected_month }}</span>
+      <strong>{{ month_summary.total if month_summary else 0 }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Open taken</span>
+      <strong>{{ month_summary.open if month_summary else 0 }}</strong>
+    </article>
+    <article class="stat-card">
+      <span>Hoge prioriteit</span>
+      <strong>{{ month_summary.high_priority if month_summary else 0 }}</strong>
+    </article>
+  </section>
+
+  <section class="dashboard-grid">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Taken in {{ selected_month }}</h2>
+        <a href="{{ url_for('tasks', month=selected_month) }}">Volledige lijst</a>
+      </div>
+      <div class="task-list">
+        {% for task in tasks %}
+          <div class="task-item status-{{ task.Status|lower }}">
+            <div>
+              <p class="task-title">{{ task.Plant }}</p>
+              <p class="task-meta">Week {{ task.Week }} • {{ task.Categorie }} • {{ task.Duur }}</p>
+            </div>
+            <div>
+              <span class="badge priority-{{ task.Prioriteit|lower }}">{{ task.Prioriteit }}</span>
+              <span class="badge neutral">{{ task.Status }}</span>
+            </div>
+            <p class="task-action">{{ task.Actie }}</p>
+            {% if task.Opmerking %}
+              <p class="task-note">{{ task.Opmerking }}</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <p class="empty-state">Geen taken gevonden voor deze maand.</p>
+        {% endfor %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Werkdruk per plant</h2>
+        <a href="{{ url_for('plants') }}">Plantregister</a>
+      </div>
+      <div class="workload-list">
+        {% for item in workload %}
+          <a class="workload-row" href="{{ url_for('plant_detail', plant_name=item.plant) }}">
+            <span>{{ item.plant }}</span>
+            <span>{{ item.tasks }} taken</span>
+            <span>{{ item.open }} open</span>
+            <span>{{ item.high }} hoog</span>
+          </a>
+        {% else %}
+          <p class="empty-state">Nog geen plantbelasting beschikbaar.</p>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+
+  <section class="dashboard-grid secondary">
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Categorieverdeling</h2>
+      </div>
+      <div class="chip-cloud">
+        {% if month_summary %}
+          {% for category, count in month_summary.categories.items() %}
+            <span class="chip">{{ category }} <strong>{{ count }}</strong></span>
+          {% endfor %}
+        {% endif %}
+      </div>
+    </article>
+
+    <article class="panel">
+      <div class="panel-head">
+        <h2>Eerstvolgende open taken</h2>
+      </div>
+      <div class="mini-list">
+        {% for task in next_up %}
+          <a class="mini-item" href="{{ url_for('tasks', month=task.Maand, plant=task.Plant) }}">
+            <strong>{{ task.Maand }}</strong>
+            <span>{{ task.Plant }}</span>
+            <small>{{ task.Actie }}</small>
+          </a>
+        {% endfor %}
+      </div>
+    </article>
+  </section>
+{% endblock %}

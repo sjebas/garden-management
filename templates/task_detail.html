@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">Taak {{ task.ID }}</p>
+      <h1>{{ task.Plant }}</h1>
+      <p class="lede">{{ task.Actie }}</p>
+    </div>
+    <div class="detail-pills">
+      <span class="pill">{{ task.Maand }}</span>
+      <span class="pill">Week {{ task.Week or "-" }}</span>
+      <span class="pill">{{ task.Categorie or "Geen categorie" }}</span>
+      <span class="pill">{{ task.Status }}</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Taak bewerken</h2>
+      <a href="{{ url_for('tasks', plant=task.Plant, month=task.Maand) }}">Terug naar takenlijst</a>
+    </div>
+    <form method="post" class="editor-grid">
+      <input name="ID" value="{{ task.ID }}" readonly>
+      <input name="Plant" list="plant-options" value="{{ task.Plant }}" required>
+      <select name="Maand" required>
+        {% for month in months %}
+          <option value="{{ month }}" {% if task.Maand == month %}selected{% endif %}>{{ month }}</option>
+        {% endfor %}
+      </select>
+      <input name="Week" type="number" min="1" max="5" value="{{ task.Week }}">
+      <select name="Categorie">
+        <option value="">Kies categorie</option>
+        {% for category in categories %}
+          <option value="{{ category }}" {% if task.Categorie == category %}selected{% endif %}>{{ category }}</option>
+        {% endfor %}
+      </select>
+      <select name="Prioriteit">
+        {% for priority in priorities %}
+          <option value="{{ priority }}" {% if task.Prioriteit == priority %}selected{% endif %}>{{ priority }}</option>
+        {% endfor %}
+      </select>
+      <select name="Status">
+        {% for status in statuses %}
+          <option value="{{ status }}" {% if task.Status == status %}selected{% endif %}>{{ status }}</option>
+        {% endfor %}
+      </select>
+      <input name="Duur" list="duration-options" value="{{ task.Duur }}">
+      <input name="DashboardVolgorde" type="number" min="1" value="{{ task.DashboardVolgorde }}">
+      <textarea name="Actie" required>{{ task.Actie }}</textarea>
+      <textarea name="Opmerking">{{ task.Opmerking }}</textarea>
+      <button type="submit">Taak opslaan</button>
+    </form>
+    <datalist id="plant-options">
+      {% for plant in plants %}
+        <option value="{{ plant }}"></option>
+      {% endfor %}
+    </datalist>
+    <datalist id="duration-options">
+      {% for duration in durations %}
+        <option value="{{ duration }}"></option>
+      {% endfor %}
+    </datalist>
+  </section>
+{% endblock %}

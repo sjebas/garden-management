@@ -1,0 +1,339 @@
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from datetime import datetime
+import json
+from pathlib import Path
+import re
+from threading import Lock
+from uuid import uuid4
+
+try:
+    from google.cloud import firestore
+except ImportError:  # pragma: no cover
+    firestore = None
+
+
+def _clean(value: object) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _task_sort_key(task: dict[str, str]) -> tuple[int, int, int, str]:
+    month_order = {
+        "Januari": 0,
+        "Februari": 1,
+        "Maart": 2,
+        "April": 3,
+        "Mei": 4,
+        "Juni": 5,
+        "Juli": 6,
+        "Augustus": 7,
+        "September": 8,
+        "Oktober": 9,
+        "November": 10,
+        "December": 11,
+    }
+    priority_order = {"Hoog": 0, "Middel": 1, "Laag": 2}
+    week = int(task["Week"]) if str(task.get("Week", "")).isdigit() else 99
+    return (
+        month_order.get(task.get("Maand", ""), 99),
+        priority_order.get(task.get("Prioriteit", ""), 99),
+        week,
+        task.get("Plant", ""),
+    )
+
+
+def _default_plant_record(values: dict[str, str], plant_id: str | None = None) -> dict[str, str]:
+    return {
+        "id": plant_id or uuid4().hex,
+        "Plant": values.get("Plant", ""),
+        "Type": values.get("Type", ""),
+        "Snoeigroep": values.get("Snoeigroep", ""),
+        "Standplaats": values.get("Standplaats", ""),
+        "Winterhard": values.get("Winterhard", ""),
+        "Notitie": values.get("Notitie", ""),
+    }
+
+
+def _default_task_record(values: dict[str, str], plant_id: str) -> dict[str, str]:
+    return {
+        "ID": values.get("ID", ""),
+        "PlantId": plant_id,
+        "Plant": values.get("Plant", ""),
+        "Maand": values.get("Maand", ""),
+        "Week": values.get("Week", ""),
+        "Categorie": values.get("Categorie", ""),
+        "Actie": values.get("Actie", ""),
+        "Prioriteit": values.get("Prioriteit", "Middel") or "Middel",
+        "Status": values.get("Status", "Open") or "Open",
+        "Duur": values.get("Duur", ""),
+        "Opmerking": values.get("Opmerking", ""),
+        "DashboardVolgorde": values.get("DashboardVolgorde", ""),
+    }
+
+
+class BaseStore(ABC):
+    @abstractmethod
+    def ensure_seeded(
+        self, plants: list[dict[str, str]], tasks: list[dict[str, str]]
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_plants(self) -> list[dict[str, str]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def list_tasks(self) -> list[dict[str, str]]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_plant_by_name(self, name: str) -> dict[str, str] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_task(self, task_id: str) -> dict[str, str] | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_plant(self, values: dict[str, str]) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_plant(self, original_name: str, values: dict[str, str]) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def ensure_plant(self, name: str) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_task(self, values: dict[str, str]) -> dict[str, str]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def update_task(self, task_id: str, values: dict[str, str]) -> dict[str, str]:
+        raise NotImplementedError
+
+
+class FileStore(BaseStore):
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = Lock()
+
+    def ensure_seeded(self, plants: list[dict[str, str]], tasks: list[dict[str, str]]) -> None:
+        payload = self._read()
+        if payload["plants"]:
+            return
+
+        seeded_plants = [_default_plant_record(item) for item in plants]
+        plant_ids = {plant["Plant"]: plant["id"] for plant in seeded_plants}
+        seeded_tasks = []
+        for item in tasks:
+            plant_id = plant_ids.get(item["Plant"])
+            if plant_id is None:
+                plant = _default_plant_record({"Plant": item["Plant"]})
+                seeded_plants.append(plant)
+                plant_ids[plant["Plant"]] = plant["id"]
+                plant_id = plant["id"]
+            seeded_tasks.append(_default_task_record(item, plant_id))
+
+        payload = {"plants": seeded_plants, "tasks": seeded_tasks}
+        self._write(payload)
+
+    def list_plants(self) -> list[dict[str, str]]:
+        return self._read()["plants"]
+
+    def list_tasks(self) -> list[dict[str, str]]:
+        return self._read()["tasks"]
+
+    def get_plant_by_name(self, name: str) -> dict[str, str] | None:
+        return next((plant for plant in self.list_plants() if plant["Plant"] == name), None)
+
+    def get_task(self, task_id: str) -> dict[str, str] | None:
+        return next((task for task in self.list_tasks() if task["ID"] == task_id), None)
+
+    def create_plant(self, values: dict[str, str]) -> dict[str, str]:
+        payload = self._read()
+        if any(plant["Plant"] == values["Plant"] for plant in payload["plants"]):
+            raise ValueError(f"Plant bestaat al: {values['Plant']}")
+        plant = _default_plant_record(values)
+        payload["plants"].append(plant)
+        self._write(payload)
+        return plant
+
+    def update_plant(self, original_name: str, values: dict[str, str]) -> dict[str, str]:
+        payload = self._read()
+        plant = next((item for item in payload["plants"] if item["Plant"] == original_name), None)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {original_name}")
+        duplicate = next(
+            (
+                item
+                for item in payload["plants"]
+                if item["Plant"] == values["Plant"] and item["Plant"] != original_name
+            ),
+            None,
+        )
+        if duplicate is not None:
+            raise ValueError(f"Plant bestaat al: {values['Plant']}")
+
+        plant.update(_default_plant_record(values, plant["id"]))
+        for task in payload["tasks"]:
+            if task["PlantId"] == plant["id"]:
+                task["Plant"] = plant["Plant"]
+        self._write(payload)
+        return plant
+
+    def ensure_plant(self, name: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is not None:
+            return plant
+        return self.create_plant({"Plant": name})
+
+    def create_task(self, values: dict[str, str]) -> dict[str, str]:
+        payload = self._read()
+        if any(task["ID"] == values["ID"] for task in payload["tasks"]):
+            raise ValueError(f"Taak-ID bestaat al: {values['ID']}")
+        plant = self.ensure_plant(values["Plant"])
+        payload = self._read()
+        task = _default_task_record(values, plant["id"])
+        payload["tasks"].append(task)
+        self._write(payload)
+        return task
+
+    def update_task(self, task_id: str, values: dict[str, str]) -> dict[str, str]:
+        payload = self._read()
+        task = next((item for item in payload["tasks"] if item["ID"] == task_id), None)
+        if task is None:
+            raise ValueError(f"Taak niet gevonden: {task_id}")
+        plant = self.ensure_plant(values["Plant"])
+        payload = self._read()
+        task = next((item for item in payload["tasks"] if item["ID"] == task_id), None)
+        task.update(_default_task_record(values, plant["id"]))
+        self._write(payload)
+        return task
+
+    def _read(self) -> dict[str, list[dict[str, str]]]:
+        if not self.path.exists():
+            return {"plants": [], "tasks": []}
+        return json.loads(self.path.read_text(encoding="utf-8"))
+
+    def _write(self, payload: dict[str, list[dict[str, str]]]) -> None:
+        with self._lock:
+            self.path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+
+
+class FirestoreStore(BaseStore):
+    def __init__(self, project_id: str | None = None, collection_prefix: str = "garden") -> None:
+        if firestore is None:
+            raise RuntimeError("google-cloud-firestore is niet beschikbaar.")
+        self.client = firestore.Client(project=project_id)
+        self.prefix = collection_prefix.strip() or "garden"
+        self.plants_collection = self.client.collection(f"{self.prefix}_plants")
+        self.tasks_collection = self.client.collection(f"{self.prefix}_tasks")
+
+    def ensure_seeded(self, plants: list[dict[str, str]], tasks: list[dict[str, str]]) -> None:
+        if list(self.plants_collection.limit(1).stream()):
+            return
+
+        batch = self.client.batch()
+        plant_ids: dict[str, str] = {}
+        for item in plants:
+            doc = self.plants_collection.document()
+            plant = _default_plant_record(item, doc.id)
+            batch.set(doc, plant)
+            plant_ids[plant["Plant"]] = plant["id"]
+
+        for item in tasks:
+            plant_id = plant_ids.get(item["Plant"])
+            if plant_id is None:
+                doc = self.plants_collection.document()
+                plant = _default_plant_record({"Plant": item["Plant"]}, doc.id)
+                batch.set(doc, plant)
+                plant_ids[plant["Plant"]] = plant["id"]
+                plant_id = plant["id"]
+            task = _default_task_record(item, plant_id)
+            batch.set(self.tasks_collection.document(task["ID"]), task)
+
+        batch.commit()
+
+    def list_plants(self) -> list[dict[str, str]]:
+        return [doc.to_dict() for doc in self.plants_collection.stream()]
+
+    def list_tasks(self) -> list[dict[str, str]]:
+        return [doc.to_dict() for doc in self.tasks_collection.stream()]
+
+    def get_plant_by_name(self, name: str) -> dict[str, str] | None:
+        docs = list(self.plants_collection.where("Plant", "==", name).limit(1).stream())
+        return docs[0].to_dict() if docs else None
+
+    def get_task(self, task_id: str) -> dict[str, str] | None:
+        doc = self.tasks_collection.document(task_id).get()
+        return doc.to_dict() if doc.exists else None
+
+    def create_plant(self, values: dict[str, str]) -> dict[str, str]:
+        if self.get_plant_by_name(values["Plant"]) is not None:
+            raise ValueError(f"Plant bestaat al: {values['Plant']}")
+        doc = self.plants_collection.document()
+        plant = _default_plant_record(values, doc.id)
+        doc.set(plant)
+        return plant
+
+    def update_plant(self, original_name: str, values: dict[str, str]) -> dict[str, str]:
+        plant = self.get_plant_by_name(original_name)
+        if plant is None:
+            raise ValueError(f"Plant niet gevonden: {original_name}")
+        duplicate = self.get_plant_by_name(values["Plant"])
+        if duplicate is not None and duplicate["id"] != plant["id"]:
+            raise ValueError(f"Plant bestaat al: {values['Plant']}")
+
+        updated = _default_plant_record(values, plant["id"])
+        batch = self.client.batch()
+        batch.set(self.plants_collection.document(plant["id"]), updated)
+        for doc in self.tasks_collection.where("PlantId", "==", plant["id"]).stream():
+            task = doc.to_dict()
+            task["Plant"] = updated["Plant"]
+            batch.set(doc.reference, task)
+        batch.commit()
+        return updated
+
+    def ensure_plant(self, name: str) -> dict[str, str]:
+        plant = self.get_plant_by_name(name)
+        if plant is not None:
+            return plant
+        return self.create_plant({"Plant": name})
+
+    def create_task(self, values: dict[str, str]) -> dict[str, str]:
+        if self.get_task(values["ID"]) is not None:
+            raise ValueError(f"Taak-ID bestaat al: {values['ID']}")
+        plant = self.ensure_plant(values["Plant"])
+        task = _default_task_record(values, plant["id"])
+        self.tasks_collection.document(task["ID"]).set(task)
+        return task
+
+    def update_task(self, task_id: str, values: dict[str, str]) -> dict[str, str]:
+        if self.get_task(task_id) is None:
+            raise ValueError(f"Taak niet gevonden: {task_id}")
+        plant = self.ensure_plant(values["Plant"])
+        task = _default_task_record(values, plant["id"])
+        self.tasks_collection.document(task_id).set(task)
+        return task
+
+
+def create_store(backend: str, file_path: Path, project_id: str | None, prefix: str) -> BaseStore:
+    if backend == "firestore":
+        return FirestoreStore(project_id=project_id, collection_prefix=prefix)
+    return FileStore(file_path)
+
+
+def generate_task_id(existing_ids: list[str], plant_name: str) -> str:
+    base = "".join(part[:1] for part in re.findall(r"[A-Za-z]+", plant_name.upper()))[:3]
+    base = (base or "TSK").ljust(3, "X")
+    pattern = re.compile(rf"^{re.escape(base)}-(\d+)$")
+    numbers = [int(match.group(1)) for value in existing_ids if (match := pattern.match(value))]
+    next_number = (max(numbers) + 1) if numbers else 1
+    return f"{base}-{next_number:02d}"

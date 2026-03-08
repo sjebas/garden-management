@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block content %}
+  <section class="hero compact">
+    <div>
+      <p class="eyebrow">{{ plant.Type }}</p>
+      <h1>{{ plant.Plant }}</h1>
+      <p class="lede">{{ plant.Notitie }}</p>
+    </div>
+    <div class="detail-pills">
+      <span class="pill">Snoeigroep: {{ plant.Snoeigroep or "Onbekend" }}</span>
+      <span class="pill">Standplaats: {{ plant.Standplaats or "Onbekend" }}</span>
+      <span class="pill">Winterhard: {{ plant.Winterhard or "Onbekend" }}</span>
+      <span class="pill">Open taken: {{ plant.OpenTaken }}</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Plantgegevens bewerken</h2>
+    </div>
+    <form method="post" action="{{ url_for('save_plant', plant_name=plant.Plant) }}" class="editor-grid">
+      <input name="Plant" value="{{ plant.Plant }}" required>
+      <input name="Type" value="{{ plant.Type }}" placeholder="Type">
+      <input name="Snoeigroep" value="{{ plant.Snoeigroep }}" placeholder="Snoeigroep">
+      <input name="Standplaats" value="{{ plant.Standplaats }}" placeholder="Standplaats">
+      <input name="Winterhard" value="{{ plant.Winterhard }}" placeholder="Winterhard">
+      <textarea name="Notitie" placeholder="Notitie">{{ plant.Notitie }}</textarea>
+      <button type="submit">Wijzigingen opslaan</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Maandritme</h2>
+    </div>
+    <div class="chip-cloud">
+      {% for month_name, count in heatmap.months.items() %}
+        <span class="chip">{{ month_name }} <strong>{{ count }}</strong></span>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Alle taken</h2>
+      <a href="{{ url_for('tasks', plant=plant.Plant) }}">Filter in takenlijst</a>
+    </div>
+    <div class="task-list">
+      {% for task in tasks %}
+        <div class="task-item status-{{ task.Status|lower }}">
+          <div>
+            <p class="task-title">{{ task.Maand }} • Week {{ task.Week }}</p>
+            <p class="task-meta">{{ task.Categorie }} • {{ task.Duur }}</p>
+          </div>
+          <div>
+            <span class="badge priority-{{ task.Prioriteit|lower }}">{{ task.Prioriteit }}</span>
+            <span class="badge neutral">{{ task.Status }}</span>
+          </div>
+          <p class="task-action">{{ task.Actie }}</p>
+          <a class="table-link" href="{{ url_for('task_detail', task_id=task.ID) }}">Taak bewerken</a>
+          {% if task.Opmerking %}
+            <p class="task-note">{{ task.Opmerking }}</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}
